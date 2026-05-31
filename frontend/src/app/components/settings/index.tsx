@@ -125,7 +125,7 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
     onRemove: () => void;
     accentColor: string;
   }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+    <div className="settings-flex-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
       {/* Sáng / Chiều toggle */}
       <button
         onClick={onToggleShift}
@@ -163,7 +163,7 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: BG, overflow: 'hidden', fontFamily: 'Inter,sans-serif' }}>
       
-      {/* Loading Spinner CSS */}
+      {/* Loading Spinner & Responsive CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
         .premium-spinner {
           width: 32px;
@@ -177,10 +177,20 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
+
+        @media (max-width: 768px) {
+          .settings-grid { grid-template-columns: 1fr !important; }
+          .settings-inner-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+          .settings-body { padding: 16px !important; padding-bottom: 100px !important; }
+          .settings-header { padding: 16px !important; flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .settings-header-btn { width: 100% !important; justify-content: center !important; }
+          .settings-flex-wrap { flex-wrap: wrap !important; gap: 6px !important; }
+          .settings-flex-col { flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; }
+        }
       `}} />
 
       {/* ── Header ── */}
-      <div style={{
+      <div className="settings-header" style={{
         padding: '18px 28px', flexShrink: 0,
         background: 'rgba(10,10,10,0.9)', backdropFilter: 'blur(16px)',
         borderBottom: '1px solid rgba(167,139,250,0.12)',
@@ -194,6 +204,7 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
           <div style={{ color: MUTED, fontSize: 12, marginTop: 4, paddingLeft: 14 }}>Cấu hình hồ sơ & lịch trình để AI cá nhân hóa cho anh Quân</div>
         </div>
         <button 
+          className="settings-header-btn"
           onClick={handleSave} 
           disabled={isSaving || isLoading}
           style={{
@@ -217,19 +228,19 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
           <span style={{ color: MUTED, fontSize: 12 }}>Đang đồng bộ hồ sơ cấu hình...</span>
         </div>
       ) : (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, maxWidth: 1200 }}>
+        <div className="settings-body" style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+          <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, maxWidth: 1200 }}>
 
             {/* ── Body Profile ── */}
             <SectionCard title="Hồ sơ cơ thể" subtitle="Dùng để tính toán thâm hụt calo" icon={<User size={17} color={ORANGE} />} neon={ORANGE}>
               <NInput label="Họ và tên" value={fullName} onChange={setFullName} type="text" icon={<User size={14} />} />
               <NInput label="Tuổi" value={age} onChange={setAge} unit="tuổi" type="number" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div className="settings-inner-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                 <NInput label="Cân nặng hiện tại" value={currentWeight} onChange={setCurrentWeight} unit="kg" type="number" neon={ORANGE} icon={<Scale size={14} />} />
                 <NInput label="Cân nặng mục tiêu" value={targetWeight} onChange={setTargetWeight} unit="kg" type="number" />
               </div>
               <div style={{ padding: '14px 16px', background: 'rgba(255,92,0,0.04)', borderRadius: 12, marginBottom: 16, border: '1px solid rgba(255,92,0,0.12)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div className="settings-flex-col" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: TEXT, fontSize: 12, fontWeight: 600 }}>Tiến trình giảm cân</span>
                   <span style={{ color: GREEN, fontSize: 12, fontWeight: 700 }}>Mục tiêu thâm hụt: 110g - 138g Đạm/ngày 🍳</span>
                 </div>
@@ -245,7 +256,7 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
               <NInput label="Mục tiêu nước hàng ngày" value={waterGoal} onChange={setWaterGoal} unit="ml" type="number" icon={<Droplets size={14} />} neon={BLUE} />
               <div>
                 <label style={{ display: 'block', color: MUTED, fontSize: 10, fontWeight: 700, letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: 9 }}>Mức độ vận động</label>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div className="settings-flex-wrap" style={{ display: 'flex', gap: 6 }}>
                   {['Ít vận động', 'Vận động nhẹ', 'Vừa phải', 'Năng động'].map((l) => {
                     const isActive = activityLevel === l;
                     return (
@@ -406,7 +417,7 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
               <NInput label="Bot Token" value={botToken} onChange={setBotToken} type="text" neon={BLUE} />
               <div>
                 <label style={{ display: 'block', color: MUTED, fontSize: 10, fontWeight: 700, letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: 9 }}>Tính cách AI</label>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div className="settings-flex-wrap" style={{ display: 'flex', gap: 8 }}>
                   {['Đanh Đá 🔥', 'Thân Thiện 😊', 'Chuyên Nghiệp 💼'].map((p) => {
                     const isActive = botPersonality === p;
                     return (

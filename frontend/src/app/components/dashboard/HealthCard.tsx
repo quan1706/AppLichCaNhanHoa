@@ -87,11 +87,11 @@ export function HealthCard({ water, onAddWater }: Props) {
           </div>
 
           {/* Quick add buttons */}
-          <div style={{ display: 'flex', gap: 4, width: '100%', marginTop: 6 }}>
-            <button onClick={() => onAddWater(250)} style={{ flex: 1, padding: '4px 0', borderRadius: 6, backgroundColor: ORANGE, border: 'none', color: TEXT, fontSize: 9, fontWeight: 800, cursor: 'pointer', boxShadow: '0 2px 6px rgba(255,92,0,0.2)' }}>
+          <div style={{ display: 'flex', gap: 6, width: '100%', marginTop: 8 }}>
+            <button onClick={() => onAddWater(250)} style={{ flex: 1, minHeight: 36, padding: '4px 0', borderRadius: 8, backgroundColor: ORANGE, border: 'none', color: TEXT, fontSize: 10, fontWeight: 800, cursor: 'pointer', boxShadow: '0 2px 6px rgba(255,92,0,0.2)' }}>
               +250ml
             </button>
-            <button onClick={() => onAddWater(500)} style={{ flex: 1, padding: '4px 0', borderRadius: 6, backgroundColor: 'transparent', border: `1px solid ${ORANGE}`, color: ORANGE, fontSize: 9, fontWeight: 800, cursor: 'pointer' }}>
+            <button onClick={() => onAddWater(500)} style={{ flex: 1, minHeight: 36, padding: '4px 0', borderRadius: 8, backgroundColor: 'transparent', border: `1px solid ${ORANGE}`, color: ORANGE, fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>
               +500
             </button>
           </div>

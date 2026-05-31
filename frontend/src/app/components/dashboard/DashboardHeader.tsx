@@ -222,6 +222,28 @@ export function DashboardToolbar({
             box-shadow: 0 0 18px rgba(255, 92, 0, 0.35);
           }
         }
+
+        /* Responsive Mobile Layout */
+        @media (max-width: 768px) {
+          .premium-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+            padding: 12px 16px;
+            gap: 12px;
+          }
+          .premium-search-wrapper {
+            max-width: 100%;
+          }
+          .premium-actions {
+            justify-content: space-between;
+          }
+          .premium-logo {
+            font-size: 14px;
+          }
+          .premium-badge {
+            font-size: 10px;
+          }
+        }
       `}} />
 
       <div className="premium-toolbar">

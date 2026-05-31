@@ -88,12 +88,12 @@ export function NToggle({ on, color = ORANGE }: { on: boolean; color?: string })
 const DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export function DaySelector({ selected, onToggle, color = ORANGE }: { selected: number[]; onToggle: (i: number) => void; color?: string }) {
   return (
-    <div style={{ display: 'flex', gap: 6 }}>
+    <div className="settings-flex-wrap" style={{ display: 'flex', gap: 6 }}>
       {DAYS_SHORT.map((d, i) => {
         const active = selected.includes(i);
         return (
           <button key={d} onClick={() => onToggle(i)} style={{
-            flex: 1, height: 38, borderRadius: 9, cursor: 'pointer',
+            flex: '1 1 auto', minWidth: 40, height: 38, borderRadius: 9, cursor: 'pointer',
             background: active ? `${color}20` : 'rgba(255,255,255,0.03)',
             border: `1px solid ${active ? color : BORDER}`,
             color: active ? color : MUTED,

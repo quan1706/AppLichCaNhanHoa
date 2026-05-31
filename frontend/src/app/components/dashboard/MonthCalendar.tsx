@@ -73,9 +73,18 @@ export function MonthCalendar({ year, month, dbSchedules = [] }: Props) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingRight: 20 }}>
-      {/* Day headers */}
-      <div style={{ display: 'flex', borderBottom: `1px solid ${BORDER}`, paddingBottom: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingRight: 20, overflowX: 'auto', overflowY: 'hidden' }}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .month-cal-inner {
+          min-width: 600px;
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+        }
+      `}} />
+      <div className="month-cal-inner">
+        {/* Day headers */}
+        <div style={{ display: 'flex', borderBottom: `1px solid ${BORDER}`, paddingBottom: 10 }}>
         {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(h => (
           <div key={h} style={{ flex: 1, textAlign: 'center', color: MUTED, fontSize: 12, fontWeight: 700 }}>{h}</div>
         ))}
@@ -129,6 +138,7 @@ export function MonthCalendar({ year, month, dbSchedules = [] }: Props) {
             })}
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

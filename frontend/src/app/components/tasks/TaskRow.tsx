@@ -17,7 +17,7 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar }
   const isUrgent = !isDone && task.daysLeft <= 1;
   
   return (
-    <div style={{
+    <div className="tasks-table-min-width task-row" style={{
       display: 'grid', gridTemplateColumns: '32px 1fr 130px 110px 120px 60px',
       gap: 12, padding: '16px', marginBottom: 8,
       background: 'rgba(18,18,18,0.4)', borderRadius: 12,
@@ -25,6 +25,7 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar }
       alignItems: 'center', transition: 'all 0.2s',
       opacity: isDone ? 0.6 : 1,
       boxShadow: isUrgent ? '0 0 16px rgba(255,92,0,0.1)' : 'none',
+      position: 'relative',
     }}>
       {/* 1. Checkbox */}
       <div 

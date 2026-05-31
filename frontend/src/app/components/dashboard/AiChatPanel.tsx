@@ -13,6 +13,7 @@ interface Props {
   onSendAi: () => void;
   chatHistory: ChatMessage[];
   onConfirmAction: (action: string, payload: any) => void;
+  onClose?: () => void;
 }
 
 export function AiChatPanel({
@@ -22,23 +23,59 @@ export function AiChatPanel({
   isSendingAi,
   onSendAi,
   chatHistory,
-  onConfirmAction
+  onConfirmAction,
+  onClose
 }: Props) {
   return (
-    <div
-      style={{
-        width: isOpen ? 320 : 0,
-        transition: 'width 0.3s ease',
-        overflow: 'hidden',
-        borderRight: isOpen ? `1px solid ${BORDER}` : 'none',
-        backgroundColor: BG,
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-      }}
-    >
-      {isOpen && (
-        <>
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .ai-chat-panel {
+          position: fixed;
+          bottom: 90px;
+          right: 24px;
+          width: 360px;
+          height: 600px;
+          max-height: 80vh;
+          background-color: rgba(18, 18, 18, 0.95);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 92, 0, 0.2);
+          border-radius: 20px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 92, 0, 0.1);
+          display: flex;
+          flex-direction: column;
+          z-index: 9999;
+          transform: translateY(20px) scale(0.95);
+          opacity: 0;
+          pointer-events: none;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .ai-chat-panel.is-open {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+          pointer-events: auto;
+        }
+        
+        @media (max-width: 768px) {
+          .ai-chat-panel {
+            bottom: 0; left: 0; right: 0;
+            width: 100% !important;
+            height: 85vh !important;
+            max-height: 85vh !important;
+            border-radius: 24px 24px 0 0;
+            border-top: 1px solid rgba(255, 92, 0, 0.3);
+            border-left: none;
+            border-right: none;
+            border-bottom: none;
+            transform: translateY(100%);
+          }
+          .ai-chat-panel.is-open {
+            transform: translateY(0);
+          }
+        }
+      `}} />
+      <div className={`ai-chat-panel ${isOpen ? 'is-open' : ''}`}>
+        {isOpen && (
+          <>
           {/* Header */}
           <div
             style={{
@@ -54,6 +91,11 @@ export function AiChatPanel({
             <h3 style={{ color: TEXT, fontSize: 14, fontWeight: 700, margin: 0, flex: 1 }}>
               Chat AI tamquan
             </h3>
+            {onClose && (
+              <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: MUTED, cursor: 'pointer', padding: 4 }}>
+                <X size={20} />
+              </button>
+            )}
           </div>
 
           {/* Content */}
@@ -261,5 +303,6 @@ export function AiChatPanel({
         </>
       )}
     </div>
+    </>
   );
 }

@@ -123,16 +123,9 @@ export function Screen3Nutrition({ onChangeTab }: { onChangeTab?: (tab: any) => 
       <button
         onClick={() => setShowAiChat(prev => !prev)}
         className={`premium-dock-handle-green ${showAiChat ? 'active' : ''}`}
-        style={{
-          left: showAiChat ? 320 : 0,
-        }}
         title={showAiChat ? 'Đóng trợ lý AI Dinh dưỡng' : 'Mở trợ lý AI Dinh dưỡng'}
       >
-        {showAiChat ? (
-          <ChevronLeft size={16} color="#7A7A7A" />
-        ) : (
-          <Sparkles size={14} color="#22C55E" style={{ filter: 'drop-shadow(0 0 4px rgba(34,197,94,0.4))' }} />
-        )}
+        <Sparkles size={20} color="#22C55E" style={{ filter: 'drop-shadow(0 0 4px rgba(34,197,94,0.4))' }} />
       </button>
 
       {/* ── Right Content: The Plan ── */}
@@ -176,7 +169,14 @@ export function Screen3Nutrition({ onChangeTab }: { onChangeTab?: (tab: any) => 
             </div>
           ) : null}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24 }}>
+          <style dangerouslySetInnerHTML={{ __html: `
+            @media (max-width: 768px) {
+              .nutrition-grid {
+                grid-template-columns: 1fr !important;
+              }
+            }
+          `}} />
+          <div className="nutrition-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24 }}>
             <MealPlan mealPlans={mealPlans} />
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -194,44 +194,48 @@ export function Screen3Nutrition({ onChangeTab }: { onChangeTab?: (tab: any) => 
         }
 
         .premium-dock-handle-green {
-          position: absolute;
-          top: 240px;
-          width: 24px;
-          height: 64px;
-          border-radius: 0 12px 12px 0;
-          background: rgba(30, 30, 30, 0.85);
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          width: 56px;
+          height: 56px;
+          border-radius: 28px;
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.2));
           backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(34, 197, 94, 0.35);
-          border-left: none;
+          border: 1px solid rgba(34, 197, 94, 0.3);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
           z-index: 999;
-          transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
-          box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 4px 20px rgba(34, 197, 94, 0.15);
         }
 
         .premium-dock-handle-green:hover {
-          width: 30px;
-          background: rgba(35, 35, 35, 0.95);
-          border-color: rgba(34, 197, 94, 0.6);
-          box-shadow: 6px 0 20px rgba(34, 197, 94, 0.2);
+          transform: scale(1.05);
+          box-shadow: 0 6px 25px rgba(34, 197, 94, 0.25);
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.3));
         }
 
         .premium-dock-handle-green:active {
-          width: 22px;
+          transform: scale(0.95);
         }
-
-        .premium-dock-handle-green.active {
-          border-color: rgba(255, 255, 255, 0.15);
-          background: rgba(25, 25, 25, 0.85);
+        
+        @media (max-width: 768px) {
+          .premium-dock-handle-green {
+            bottom: 90px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+          }
         }
-
-        .premium-dock-handle-green.active:hover {
-          border-color: rgba(34, 197, 94, 0.4);
-          background: rgba(30, 30, 30, 0.95);
+        
+        /* Hide toggle button when chat is open on mobile to avoid overlap */
+        @media (max-width: 768px) {
+          .premium-dock-handle-green.active {
+            display: none !important;
+          }
         }
       `}} />
     </div>

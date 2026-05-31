@@ -60,6 +60,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
   const [newIsStarred, setNewIsStarred] = useState(false);
   const [newSubmissionType, setNewSubmissionType] = useState<'CMS' | 'class'>('CMS');
   const [isSaving, setIsSaving] = useState(false);
+  const [showSidebarMobile, setShowSidebarMobile] = useState(false);
 
   const toggleFilter = (id: string) => setFilters(p => ({ ...p, [id]: !p[id] }));
 
@@ -208,7 +209,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: BG, overflow: 'hidden', fontFamily: 'Inter,sans-serif', position: 'relative' }}>
       
-      {/* Dynamic spinner CSS */}
+      {/* Dynamic spinner & Responsive CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
         .premium-spinner {
           width: 32px;
@@ -222,27 +223,114 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
+
+        /* Responsive Mobile Layout cho Tasks */
+        @media (max-width: 768px) {
+          .tasks-body-container {
+            flex-direction: column !important;
+            overflow-y: auto !important;
+          }
+          .task-sidebar {
+            display: none !important;
+            width: 100% !important;
+            min-width: 100% !important;
+            border-left: none !important;
+            border-top: 1px solid rgba(96,165,250,0.12) !important;
+            padding-bottom: 80px !important; /* Tránh đè lên Bottom Nav */
+          }
+          .task-sidebar.show-mobile {
+            display: flex !important;
+          }
+          .tasks-list-container {
+            overflow-x: auto !important;
+            padding: 16px !important;
+            flex: none !important; /* Prevent shrinking to 0 height */
+          }
+          .tasks-table-min-width {
+            min-width: 100% !important;
+          }
+          .tasks-table-header {
+            display: none !important;
+          }
+          .task-row {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            padding: 16px 12px !important;
+            gap: 8px !important;
+          }
+          .task-row > div {
+            margin-bottom: 2px;
+          }
+          /* Checkbox */
+          .task-row > div:nth-child(1) {
+            flex: 0 0 24px !important;
+          }
+          /* Name */
+          .task-row > div:nth-child(2) {
+            flex: 1 1 calc(100% - 60px) !important;
+          }
+          /* Course */
+          .task-row > div:nth-child(3) {
+            flex: 0 0 100% !important;
+            padding-left: 36px !important;
+            font-size: 11px !important;
+            opacity: 0.8;
+          }
+          /* Due Date */
+          .task-row > div:nth-child(4) {
+            flex: 0 0 auto !important;
+            padding-left: 36px !important;
+          }
+          /* Status */
+          .task-row > div:nth-child(5) {
+            flex: 1 1 auto !important;
+            display: flex;
+            align-items: center;
+          }
+          /* Star */
+          .task-row > div:nth-child(6) {
+            position: absolute !important;
+            top: 12px !important;
+            right: 12px !important;
+          }
+          .tasks-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            padding: 16px !important;
+            gap: 16px !important;
+          }
+          .tasks-header-title span {
+            font-size: 18px !important;
+          }
+          .tasks-header-actions {
+            width: 100% !important;
+            justify-content: space-between !important;
+          }
+        }
       `}} />
 
       {/* ── Header ── */}
-      <div style={{
+      <div className="tasks-header" style={{
         padding: '20px 28px', flexShrink: 0, background: 'rgba(10,10,10,0.9)', backdropFilter: 'blur(16px)',
         borderBottom: '1px solid rgba(96,165,250,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <div>
+        <div className="tasks-header-title">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 4, height: 20, borderRadius: 2, background: BLUE, boxShadow: `0 0 10px rgba(96,165,250,0.8)` }} />
             <span style={{ color: TEXT, fontSize: 20, fontWeight: 800 }}>Quản lý Deadline & Công việc</span>
           </div>
           <div style={{ color: MUTED, fontSize: 12, marginTop: 4, paddingLeft: 14 }}>Sắp xếp theo: Ưu tiên & Khẩn cấp ⚡</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button style={{
+        <div className="tasks-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button 
+            onClick={() => setShowSidebarMobile(!showSidebarMobile)}
+            style={{
             display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10,
-            background: `rgba(96,165,250,0.1)`, border: `1px solid rgba(96,165,250,0.25)`,
+            background: showSidebarMobile ? `rgba(96,165,250,0.25)` : `rgba(96,165,250,0.1)`, 
+            border: `1px solid rgba(96,165,250,0.25)`,
             color: BLUE, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
           }}>
-            <Filter size={13} /> Bộ lọc
+            <Filter size={13} /> {showSidebarMobile ? 'Đóng bộ lọc' : 'Bộ lọc'}
           </button>
           
           <button 
@@ -260,14 +348,14 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
       </div>
 
       {/* ── Body ── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div className="tasks-body-container" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         
         {/* Task List */}
-        <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
+        <div className="tasks-list-container" style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
           <TaskStats tasks={tasks} />
 
           {/* Table headers */}
-          <div style={{
+          <div className="tasks-table-min-width tasks-table-header" style={{
             display: 'grid', gridTemplateColumns: '32px 1fr 130px 110px 120px 60px',
             gap: 12, padding: '6px 16px', marginBottom: 6,
             color: MUTED, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
@@ -303,7 +391,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
         </div>
 
         {/* Sidebar */}
-        <TaskSidebar filters={filters} onToggleFilter={toggleFilter} />
+        <TaskSidebar filters={filters} onToggleFilter={toggleFilter} className={showSidebarMobile ? 'show-mobile' : ''} />
       </div>
 
       {/* ── Add Modal Overlay ── */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
+import { Send, Sparkles, ChevronLeft, ChevronRight, MessageSquare, X } from 'lucide-react';
 import { BG, ORANGE, TEXT, MUTED, BORDER, GREEN } from './nutritionUtils';
 
 interface ChatMessage {
@@ -75,21 +75,53 @@ export function NutritionChat({
   };
 
   return (
-    <div style={{
-      position: 'absolute',
-      top: 0,
-      left: isOpen ? 0 : -320,
-      width: 320, 
-      height: '100%', 
-      borderRight: `1px solid ${BORDER}`,
-      background: 'rgba(10,10,10,0.85)', 
-      backdropFilter: 'blur(16px)',
-      display: 'flex', 
-      flexDirection: 'column', 
-      transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      zIndex: 998,
-      boxShadow: isOpen ? '10px 0 30px rgba(0,0,0,0.5)' : 'none'
-    }}>
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .nutrition-chat-panel {
+          position: fixed;
+          bottom: 90px;
+          right: 24px;
+          width: 360px;
+          height: 600px;
+          max-height: 80vh;
+          background-color: rgba(18, 18, 18, 0.95);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(34, 197, 94, 0.2);
+          border-radius: 20px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(34, 197, 94, 0.1);
+          display: flex;
+          flex-direction: column;
+          z-index: 9999;
+          transform: translateY(20px) scale(0.95);
+          opacity: 0;
+          pointer-events: none;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .nutrition-chat-panel.is-open {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+          pointer-events: auto;
+        }
+        
+        @media (max-width: 768px) {
+          .nutrition-chat-panel {
+            bottom: 0; left: 0; right: 0;
+            width: 100% !important;
+            height: 85vh !important;
+            max-height: 85vh !important;
+            border-radius: 24px 24px 0 0;
+            border-top: 1px solid rgba(34, 197, 94, 0.3);
+            border-left: none;
+            border-right: none;
+            border-bottom: none;
+            transform: translateY(100%);
+          }
+          .nutrition-chat-panel.is-open {
+            transform: translateY(0);
+          }
+        }
+      `}} />
+      <div className={`nutrition-chat-panel ${isOpen ? 'is-open' : ''}`}>
       {/* Header */}
       <div style={{ padding: '20px 24px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -110,7 +142,7 @@ export function NutritionChat({
           onClick={onClose}
           style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: MUTED, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, borderRadius: 6 }}
         >
-          <ChevronLeft size={20} />
+          <X size={20} />
         </button>
       </div>
 
@@ -179,6 +211,7 @@ export function NutritionChat({
         </div>
       </div>
     </div>
+    </>
   );
 }
 

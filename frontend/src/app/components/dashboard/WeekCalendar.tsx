@@ -114,29 +114,38 @@ export function WeekCalendar({ weekDays, dbSchedules }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
 
   return (
-    <div style={{ position: 'relative', flex: 1 }}>
-      {/* ── Day headers ── */}
-      <div style={{ display: 'flex', marginLeft: 52, marginBottom: 0, flexShrink: 0 }}>
-        {weekDays.map(d => (
-          <div key={d.short} style={{
-            flex: 1, textAlign: 'center', paddingBottom: 6,
-            borderBottom: `2px solid ${d.today ? ORANGE : BORDER}`,
-          }}>
-            <div style={{ color: d.today ? ORANGE : MUTED, fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
-              {d.short}
-            </div>
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%', margin: '4px auto 0',
-              backgroundColor: d.today ? ORANGE : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+    <div style={{ position: 'relative', flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .week-cal-inner {
+          min-width: 600px; /* Force minimum width to prevent squishing on mobile */
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+      `}} />
+      <div className="week-cal-inner">
+        {/* ── Day headers ── */}
+        <div style={{ display: 'flex', marginLeft: 52, marginBottom: 0, flexShrink: 0 }}>
+          {weekDays.map(d => (
+            <div key={d.short} style={{
+              flex: 1, textAlign: 'center', paddingBottom: 6,
+              borderBottom: `2px solid ${d.today ? ORANGE : BORDER}`,
             }}>
-              <span style={{ color: d.today ? '#fff' : TEXT, fontSize: 12.5, fontWeight: d.today ? 700 : 400 }}>
-                {d.date}
-              </span>
+              <div style={{ color: d.today ? ORANGE : MUTED, fontSize: 10.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+                {d.short}
+              </div>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%', margin: '4px auto 0',
+                backgroundColor: d.today ? ORANGE : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span style={{ color: d.today ? '#fff' : TEXT, fontSize: 12.5, fontWeight: d.today ? 700 : 400 }}>
+                  {d.date}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
       {/* ── Time grid ── */}
       <div style={{ position: 'relative', display: 'flex', marginTop: 6 }}>
@@ -267,6 +276,7 @@ export function WeekCalendar({ weekDays, dbSchedules }: Props) {
             </div>
           );
         })}
+      </div>
       </div>
 
       {/* Modal - Coming soon */}

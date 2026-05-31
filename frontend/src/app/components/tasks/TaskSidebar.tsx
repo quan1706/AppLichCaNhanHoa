@@ -12,11 +12,12 @@ const FILTERS = [
 interface Props {
   filters: Record<string, boolean>;
   onToggleFilter: (id: string) => void;
+  className?: string;
 }
 
-export function TaskSidebar({ filters, onToggleFilter }: Props) {
+export function TaskSidebar({ filters, onToggleFilter, className = '' }: Props) {
   return (
-    <div style={{
+    <div className={`task-sidebar ${className}`} style={{
       width: 280, minWidth: 280,
       background: GLASS2, backdropFilter: 'blur(16px)',
       borderLeft: `1px solid ${BORDER}`,

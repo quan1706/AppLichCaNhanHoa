@@ -31,7 +31,7 @@ export default function App() {
   useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
 
   return (
-    <div style={{
+    <div className="app-container" style={{
       display: 'flex', height: '100vh',
       backgroundColor: '#080808',
       fontFamily: "'Inter', 'SF Pro Display', system-ui, -apple-system, sans-serif",
@@ -107,11 +107,19 @@ export default function App() {
           0%   { transform: scale(0); opacity: 0.6; }
           100% { transform: scale(2.5); opacity: 0; }
         }
+        @media (max-width: 768px) {
+          .app-container {
+            flex-direction: column-reverse !important;
+          }
+          .main-content-wrapper {
+            animation: none !important;
+          }
+        }
       `}</style>
 
       <SharedSidebar active={displayTab} onChangeTab={handleChangeTab} />
 
-      <div style={{
+      <div className="main-content-wrapper" style={{
         flex: 1, overflow: 'hidden', position: 'relative',
         animation: animating ? 'fadeSlideOut 0.18s ease forwards' : 'fadeSlideIn 0.22s ease forwards',
       }}>

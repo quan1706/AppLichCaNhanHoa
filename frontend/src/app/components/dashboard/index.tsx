@@ -38,6 +38,43 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
   const [showAiChatModal, setShowAiChatModal] = useState(false);
   const [targetWeight, setTargetWeight] = useState<number | string>('78');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Add Schedule Form States
+  const [newScheduleTitle, setNewScheduleTitle] = useState('');
+  const [newScheduleType, setNewScheduleType] = useState('class');
+  const [newScheduleStartTime, setNewScheduleStartTime] = useState('08:00');
+  const [newScheduleEndTime, setNewScheduleEndTime] = useState('10:00');
+  const [newScheduleDate, setNewScheduleDate] = useState('');
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+
+  const handleAddScheduleSubmit = async () => {
+    if (!newScheduleTitle.trim()) { toast.error('Vui lòng nhập tên lịch!'); return; }
+    if (!newScheduleDate) { toast.error('Vui lòng chọn ngày!'); return; }
+    setIsSavingSchedule(true);
+    try {
+      const scheduleToInsert = {
+        profile_id: QUAN_UUID,
+        type: newScheduleType,
+        title: newScheduleTitle.trim(),
+        days: null,
+        specific_date: newScheduleDate,
+        start_time: newScheduleStartTime + ':00',
+        end_time: newScheduleEndTime + ':00',
+        shift: parseInt(newScheduleStartTime.split(':')[0]) >= 12 ? 'afternoon' : 'morning'
+      };
+      const { error } = await supabase.from('schedules').insert([scheduleToInsert]);
+      if (error) throw error;
+      toast.success('Đã thêm lịch thành công! 💅');
+      setShowAddScheduleModal(false);
+      setNewScheduleTitle('');
+      fetchSchedules();
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi thêm lịch!');
+    } finally {
+      setIsSavingSchedule(false);
+    }
+  };
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 
   // Fetch Data
@@ -279,7 +316,7 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
         setSearchQuery={setSearchQuery}
       />
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+      <div className="dashboard-content" style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
 
         {/* AI Chat Panel - slides in between nav and calendar */}
         <AiChatPanel
@@ -290,10 +327,11 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
           onSendAi={handleSendAi}
           chatHistory={chatHistory}
           onConfirmAction={handleConfirmAction}
+          onClose={() => setShowAiChatModal(false)}
         />
 
         {/* Main calendar area */}
-        <div style={{ flex: 1, padding: '0 0 16px 16px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="main-calendar" style={{ flex: 1, padding: '0 0 16px 16px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <TimeNavigation
             navLabel={getNavLabel()}
             viewMode={viewMode}
@@ -307,7 +345,7 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
         </div>
 
         {/* Right sidebar widgets */}
-        <div style={{
+        <div className="right-sidebar" style={{
           width: 350, minWidth: 350, padding: '16px 20px', borderLeft: `1px solid ${BORDER}`,
           flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12, height: '100%', overflowY: 'auto', overflowX: 'hidden'
         }}>
@@ -318,47 +356,83 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
         </div>
       </div>
 
-      {/* Custom Styles for AI Docked Handle */}
+      {/* Custom Styles for AI Docked Handle & Responsive Layout */}
       <style dangerouslySetInnerHTML={{ __html: `
+        .dashboard-content {
+          flex: 1; display: flex; overflow: hidden; position: relative;
+        }
+        .main-calendar {
+          flex: 1; padding: 0 0 16px 16px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;
+        }
+        .right-sidebar {
+          width: 350px; min-width: 350px; padding: 16px 20px; border-left: 1px solid ${BORDER};
+          flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; height: 100%; overflow-y: auto; overflow-x: hidden;
+        }
+        
+        @media (max-width: 768px) {
+          .dashboard-content {
+            flex-direction: column !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+          }
+          .main-calendar {
+            padding: 16px !important;
+            overflow-y: visible !important; 
+            flex: none !important;
+          }
+          .right-sidebar {
+            width: 100% !important;
+            min-width: 100% !important;
+            border-left: none !important;
+            border-top: 1px solid rgba(255,255,255,0.08) !important;
+            height: auto !important;
+            overflow-y: visible !important;
+            padding-bottom: 96px !important; /* Spacing for bottom tab bar */
+          }
+        }
+
         .premium-dock-handle {
-          position: absolute;
-          top: 240px;
-          width: 24px;
-          height: 64px;
-          border-radius: 0 12px 12px 0;
-          background: rgba(30, 30, 30, 0.85);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 92, 0, 0.35);
-          border-left: none;
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #FF7A00 0%, #FF3D00 100%);
+          border: none;
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          z-index: 999;
-          transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
-          box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
+          z-index: 1000;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 8px 24px rgba(255, 92, 0, 0.4);
         }
 
         .premium-dock-handle:hover {
-          width: 30px;
-          background: rgba(35, 35, 35, 0.95);
-          border-color: rgba(255, 92, 0, 0.6);
-          box-shadow: 6px 0 20px rgba(255, 92, 0, 0.2);
+          transform: scale(1.05) translateY(-2px);
+          box-shadow: 0 12px 28px rgba(255, 92, 0, 0.5);
         }
 
         .premium-dock-handle:active {
-          width: 22px;
+          transform: scale(0.95);
         }
 
         .premium-dock-handle.active {
-          border-color: rgba(255, 255, 255, 0.15);
-          background: rgba(25, 25, 25, 0.85);
+          background: rgba(30, 30, 30, 0.9);
+          border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .premium-dock-handle.active:hover {
-          border-color: rgba(255, 92, 0, 0.4);
-          background: rgba(30, 30, 30, 0.95);
+        @media (max-width: 768px) {
+          .premium-dock-handle {
+            bottom: 96px; /* above bottom bar */
+            right: 16px;
+            width: 50px; 
+            height: 50px;
+          }
+          .premium-dock-handle.active {
+            display: none; /* Hide toggle button when modal is open on mobile */
+          }
         }
       `}} />
 
@@ -366,17 +440,99 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
       <button
         onClick={() => setShowAiChatModal(prev => !prev)}
         className={`premium-dock-handle ${showAiChatModal ? 'active' : ''}`}
-        style={{
-          left: showAiChatModal ? 320 : 0,
-        }}
         title={showAiChatModal ? 'Đóng trợ lý AI' : 'Mở trợ lý AI'}
       >
         {showAiChatModal ? (
-          <ChevronLeft size={16} color="#7A7A7A" />
+          <X size={24} color="#FFFFFF" />
         ) : (
-          <Sparkles size={14} color="#FF5C00" style={{ filter: 'drop-shadow(0 0 4px rgba(255, 92, 0, 0.4))' }} />
+          <MessageCircle size={24} color="#FFFFFF" />
         )}
       </button>
+
+      {/* Add Schedule Modal */}
+      {showAddScheduleModal && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          <div style={{
+            width: 480, background: 'rgba(18,18,18,0.95)', border: `1px solid ${BORDER}`,
+            borderRadius: 16, padding: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#FF5C00', boxShadow: '0 0 8px rgba(255,92,0,0.8)' }} />
+                Thêm Lịch Trình
+              </div>
+              <button onClick={() => setShowAddScheduleModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#7A7A7A' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Tên lịch trình</label>
+                <input 
+                  value={newScheduleTitle} onChange={e => setNewScheduleTitle(e.target.value)}
+                  placeholder="VD: Họp dự án..." 
+                  style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none' }} 
+                />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Phân loại</label>
+                  <select 
+                    value={newScheduleType} onChange={e => setNewScheduleType(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', background: 'rgba(10,10,10,1)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none' }}>
+                    <option value="class">Học tập / Lớp học</option>
+                    <option value="work">Công việc</option>
+                    <option value="workout">Tập luyện</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Ngày (Cụ thể)</label>
+                  <input 
+                    type="date" value={newScheduleDate} onChange={e => setNewScheduleDate(e.target.value)}
+                    style={{ width: '100%', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none', colorScheme: 'dark' }} 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Giờ bắt đầu</label>
+                  <input 
+                    type="time" value={newScheduleStartTime} onChange={e => setNewScheduleStartTime(e.target.value)}
+                    style={{ width: '100%', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none', colorScheme: 'dark' }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Giờ kết thúc</label>
+                  <input 
+                    type="time" value={newScheduleEndTime} onChange={e => setNewScheduleEndTime(e.target.value)}
+                    style={{ width: '100%', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none', colorScheme: 'dark' }} 
+                  />
+                </div>
+              </div>
+
+              <button 
+                onClick={handleAddScheduleSubmit} disabled={isSavingSchedule}
+                style={{
+                  width: '100%', padding: '12px 0', borderRadius: 8, marginTop: 10,
+                  background: '#FF5C00', border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: isSavingSchedule ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 0 16px rgba(255,92,0,0.4)', opacity: isSavingSchedule ? 0.7 : 1
+                }}
+              >
+                {isSavingSchedule ? 'Đang tạo...' : 'Tạo Lịch'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
