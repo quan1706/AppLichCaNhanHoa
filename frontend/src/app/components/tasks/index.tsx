@@ -75,48 +75,9 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
 
       if (taskErr) throw taskErr;
 
-      const { data: fitnessPlans, error: fitErr } = await supabase
-        .from('ai_fitness_plan')
-        .select('*')
-        .order('date', { ascending: true });
-
-      if (fitErr) throw fitErr;
-
       let allTasks: Task[] = [];
       if (dbTasks) {
         allTasks = dbTasks.map(mapDbDeadlineToTask);
-      }
-
-      if (fitnessPlans) {
-        fitnessPlans.forEach(plan => {
-           if (plan.workout_schedule) {
-              const match = plan.workout_schedule.match(/^(\d{2}:\d{2})/);
-              const timeStr = match ? match[1] : '17:00';
-              const dateTime = new Date(`${plan.date}T${timeStr}:00`).toISOString();
-              
-              const dueTime = new Date(dateTime).getTime();
-              const nowTime = new Date().getTime();
-              const diffDays = Math.ceil((dueTime - nowTime) / (1000 * 60 * 60 * 24));
-
-              const dateObj = new Date(dateTime);
-              const dueFormatted = dateObj.toLocaleString('vi-VN', {
-                day: '2-digit', month: '2-digit', year: 'numeric',
-                hour: '2-digit', minute: '2-digit'
-              });
-
-              allTasks.push({
-                id: `workout_${plan.id}`,
-                code: 'FITNESS',
-                name: plan.workout_schedule,
-                course: 'FITNESS',
-                due: dueFormatted,
-                daysLeft: isNaN(diffDays) ? 0 : diffDays,
-                status: 'pending',
-                starred: true,
-                notes: 'AI Fitness Schedule',
-              });
-           }
-        });
       }
       
       setTasks(allTasks);
@@ -135,10 +96,6 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
 
   // 2. Toggle Task Complete Status
   const toggleTask = async (id: string) => {
-    if (id.startsWith('workout_')) {
-      toast.info('Lịch tập do AI lên, không thể đánh dấu tại đây! 💪');
-      return;
-    }
     const task = tasks.find(t => t.id === id);
     if (!task) return;
     const newStatus = task.status === 'done' ? 'pending' : 'done';
@@ -165,7 +122,6 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
 
   // 3. Toggle Star/Priority Status
   const toggleStar = async (id: string) => {
-    if (id.startsWith('workout_')) return;
     const task = tasks.find(t => t.id === id);
     if (!task) return;
     const newStarred = !task.starred;

@@ -3,14 +3,13 @@
 import { useState } from 'react';
 import { LayoutDashboard, Calendar, Utensils, Settings, MessageSquare } from 'lucide-react';
 
-type NavTab = 'dashboard' | 'schedule' | 'nutrition' | 'settings' | 'bot';
+type NavTab = 'dashboard' | 'schedule' | 'nutrition' | 'settings';
 
 const NAV: { id: NavTab; icon: typeof LayoutDashboard; label: string; neon: string; glow: string }[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', neon: '#FF5C00', glow: 'rgba(255,92,0,0.35)' },
   { id: 'schedule',  icon: Calendar,        label: 'Lịch trình', neon: '#60A5FA', glow: 'rgba(96,165,250,0.35)' },
   { id: 'nutrition', icon: Utensils,        label: 'Dinh dưỡng', neon: '#22C55E', glow: 'rgba(34,197,94,0.35)' },
   { id: 'settings',  icon: Settings,        label: 'Cài đặt',    neon: '#A78BFA', glow: 'rgba(167,139,250,0.35)' },
-  { id: 'bot',       icon: MessageSquare,   label: 'Bot',         neon: '#22D3EE', glow: 'rgba(34,211,238,0.35)' },
 ];
 
 export function SharedSidebar({
