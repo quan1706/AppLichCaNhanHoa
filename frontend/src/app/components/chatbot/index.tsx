@@ -16,7 +16,7 @@ export function Screen5Chatbot() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typing]);
 
-  const send = (text?: string) => {
+  const send = async (text?: string) => {
     const content = text || input.trim();
     if (!content) return;
     const now = new Date();
@@ -26,14 +26,41 @@ export function Screen5Chatbot() {
     setInput('');
     setTyping(true);
 
-    setTimeout(() => {
-      setTyping(false);
+    try {
+      // Phân tích thông minh để định tuyến đến API phù hợp
+      const isNutritionRelated = /nhậu|bia|rượu|tiệc|ăn|uống|nước|thực đơn|calo|kcal|protein|đạm|chợ|rau|thịt|cá|bữa|sáng|trưa|tối|ngân sách|sinh nhật/i.test(content);
+      const apiUrl = isNutritionRelated ? '/api/ai/nutrition' : '/api/ai/fitness';
+      
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: content })
+      });
+
+      if (!res.ok) throw new Error('Phản hồi API không thành công');
+      const result = await res.json();
+
+      if (result.ok) {
+        setMessages(prev => [...prev, {
+          id: `m${Date.now()}_bot`,
+          from: 'bot',
+          text: result.response_message,
+          time,
+        }]);
+      } else {
+        throw new Error(result.error || 'Lỗi không xác định từ API');
+      }
+    } catch (err) {
+      console.error('Lỗi gọi API chatbot:', err);
       setMessages(prev => [...prev, {
-        id: `m${Date.now()}_bot`, from: 'bot',
-        text: 'Đã nhận thông tin rồi! Để tôi cập nhật lịch cho anh Quân ngay! 🔥 Thực ra làm biếng lắm nhưng thôi kệ!',
+        id: `m${Date.now()}_bot`,
+        from: 'bot',
+        text: 'Hic cưng ơi, Groq AI của tamquan đang bận chuẩn bị thực đơn rồi. Tẹo nữa nhắn lại giùm chị nhé! 💅',
         time,
       }]);
-    }, 1400);
+    } finally {
+      setTyping(false);
+    }
   };
 
   return (

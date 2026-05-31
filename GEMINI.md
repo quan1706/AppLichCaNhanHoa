@@ -120,11 +120,14 @@ Dự án Trợ lý số Cá nhân hóa (Personal Productivity & Weight Loss Assi
   - Cung cấp đạm từ 110-138g/ngày (cho mốc 92kg).
   - Ưu tiên Cardio nhẹ nhàng các ngày trong tuần (T2, T4, T6) từ 30-60p, tập nặng vào cuối tuần.
   - Quỹ calo dự phòng (Cheat meal buffer) phải luôn được chừa ra 10-15%/tuần.
-- **Hành vi Bot (Persona)**: Nghiêm khắc, hài hước, ngôn từ thực tế (sử dụng Telegram bot).
+  - Bắt buộc tích hợp các loại trái cây & siêu thực phẩm thể hình siêu rẻ: **Chuối tiêu** (bổ sung carbs nhanh trước/sau tập), **Ổi giòn** (giàu vitamin C, nhiều xơ giúp đốt mỡ làm tráng miệng), **Sữa chua không đường** và **Yến mạch**.
+  - **Cấu hình nguyên liệu yêu thích (Favorite Ingredients Rule)**: AI Agent PHẢI tuân thủ và nạp cấu hình nguyên liệu ưa thích từ tệp `.agent/rules/user-preferences.md` làm chỉ dẫn tối cao khi soạn đơn và lên thực đơn. Chỉ xoay quanh các nguyên liệu yêu thích của cưng Quân: Rau luộc (bông cải xanh, súp lơ, bắp cải, dưa chuột, cà chua, ớt chuông, cà tím), Đạm (trứng gà, đậu phụ luộc, nấm, đậu hạt), Thịt cá (gà/ức gà, thịt lợn nạc, thịt bò, cá hộp/cá hấp), Trái cây (chuối tiêu, táo, trái cây nhiệt đới), Ngũ cốc tinh bột (yến mạch, khoai lang). Ưu tiên cao độ Ức gà phi lê và Khoai lang luộc làm mặc định (xuất hiện ít nhất 3-4 ngày/tuần). **BẮT BUỘC** ghi rõ định lượng cụ thể bằng gram/quả/chén/hộp cho từng thành phần (VD: `150g ức gà`, `150g khoai lang luộc`, `2 quả trứng luộc`, `1 hũ sữa chua`) trong tất cả các bữa ăn của Quân. Ưu tiên các món khô, luộc, hấp, áp chảo siêu tốc dễ chế biến dưới 10 phút.
+- **Quy tắc Meal Prep (Tiết kiệm thời gian)**: Bữa sáng ăn nhanh không nấu (đã prep), Bữa trưa mang hộp cơm (quay vi sóng 2 phút), Bữa tối ăn thong thả + có canh nóng + tiến hành chuẩn bị thức ăn cho sáng/trưa mai.
+- **Hành vi Bot (Persona)**: PT Gym & Fitness Nutritionist Chuyên nghiệp, Động lực, Thực tế, Hài hước xéo xắt duyên dáng (sử dụng Telegram bot, luôn khích lệ kỷ luật thép 🏋️‍♂️💪💅).
 
 ### 5. Lộ trình triển khai (Roadmap)
 - **Giai đoạn 1**: Thiết lập Supabase (Schema + RLS) và lấy Token Telegram Bot.
-- **Giai đoạn 2**: Viết Core Bot bằng Next.js API Routes, bóc tách NLP với Gemini Flash.
+- **Giai đoạn 2**: Viết Core Bot bằng Next.js API Routes, bóc tách NLP với Groq API.
 - **Giai đoạn 3**: Triển khai Automation nhắc uống nước/deadline với Supabase Edge Functions.
 - **Giai đoạn 4**: Xây dựng Web Dashboard (Next.js) trực quan hóa tiến trình giảm cân và lịch trình.
 

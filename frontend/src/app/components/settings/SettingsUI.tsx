@@ -1,13 +1,27 @@
-'use client';
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ORANGE, MUTED, BORDER, TEXT, GLASS } from './settingsUtils';
 
-export function NInput({ label, value, unit, type = 'text', icon, neon = ORANGE }: {
-  label: string; value: string | number; unit?: string; type?: string; icon?: React.ReactNode; neon?: string;
+export function NInput({ label, value, onChange, unit, type = 'text', icon, neon = ORANGE }: {
+  label: string; value: string | number; onChange?: (v: string) => void; unit?: string; type?: string; icon?: React.ReactNode; neon?: string;
 }) {
-  const [val, setVal] = useState(String(value));
+  const [localVal, setLocalVal] = useState(String(value));
   const [focused, setFocused] = useState(false);
+
+  // Keep local state in sync when value from parent changes
+  useEffect(() => {
+    setLocalVal(String(value));
+  }, [value]);
+
+  const displayVal = onChange ? String(value) : localVal;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVal = e.target.value;
+    setLocalVal(newVal);
+    if (onChange) {
+      onChange(newVal);
+    }
+  };
+
   return (
     <div style={{ marginBottom: 16 }}>
       <label style={{
@@ -31,7 +45,7 @@ export function NInput({ label, value, unit, type = 'text', icon, neon = ORANGE 
         }} />
         {icon && <div style={{ padding: '0 12px', color: focused ? neon : MUTED, transition: 'color 0.2s', flexShrink: 0 }}>{icon}</div>}
         <input
-          type={type} value={val} onChange={e => setVal(e.target.value)}
+          type={type} value={displayVal} onChange={handleChange}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           style={{
             flex: 1, padding: icon ? '11px 12px 11px 0' : '11px 14px',

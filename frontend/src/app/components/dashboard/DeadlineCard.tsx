@@ -22,12 +22,8 @@ export function DeadlineCard({ items }: Props) {
     };
   }).filter(i => i.status !== 'done').slice(0, 3);
 
-  // Fallback mock data when DB is empty
-  const displayItems = processed.length > 0 ? processed : [
-    { code: 'SE17B01', name: 'Bài tập Kỹ thuật phần mềm', days: 2,  urgent: true  },
-    { code: 'SE17B03', name: 'Báo cáo Lab – Kiểm thử',    days: 5,  urgent: false },
-    { code: 'PRM392',  name: 'Phát triển Di động – Demo', days: 9,  urgent: false },
-  ];
+  // Fallback mock data when DB is empty removed. Returning empty array if no data.
+  const displayItems = processed.length > 0 ? processed : [];
 
   return (
     <div style={{ backgroundColor: CARD2, borderRadius: 16, padding: '14px 16px', border: `1px solid ${BORDER}`, boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>

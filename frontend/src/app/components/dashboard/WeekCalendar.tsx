@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import {
   BG, CARD, ORANGE, MUTED, BORDER, TEXT,
   START_H, PX_PER_H, HOURS,
   CEvent, getEventsForDay, parseTimeToHours, formatTime,
 } from './calendarUtils';
+import { Plus } from 'lucide-react';
 
 interface WeekDay {
   short: string;
@@ -18,38 +20,101 @@ interface Props {
   dbSchedules: any[];
 }
 
-function getCombinedEvents(date: Date, dbSchedules: any[]): CEvent[] {
-  const fixed = getEventsForDay(date);
+function parseTimeToDecimal(timeStr: string): number {
+  if (!timeStr) return 0;
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return 0;
+  return parseInt(parts[0]) + parseInt(parts[1]) / 60;
+}
 
+function getCombinedEvents(date: Date, dbSchedules: any[]): CEvent[] {
+  const day = date.getDay(); // 0: CN, 1: T2, etc.
+
+  // Lọc lịch cố định của ngày hôm nay từ dbSchedules (lịch lặp lại hàng tuần hoặc theo ngày cụ thể)
   const dbToday = dbSchedules.filter(item => {
-    const t = new Date(item.start_time);
-    return t.getFullYear() === date.getFullYear() &&
-           t.getMonth()    === date.getMonth()    &&
-           t.getDate()     === date.getDate();
+    // Nếu có specific_date, chỉ hiển thị đúng ngày đó
+    if (item.specific_date) {
+      const sDate = new Date(item.specific_date);
+      return sDate.getFullYear() === date.getFullYear() && 
+             sDate.getMonth() === date.getMonth() && 
+             sDate.getDate() === date.getDate();
+    }
+
+    // Nếu không có specific_date, kiểm tra lặp theo mảng days
+    if (Array.isArray(item.days)) {
+      const isDayMatch = item.days.includes(day);
+      if (!isDayMatch) return false;
+
+      // Logic lọc nâng cao cho lịch học FPTU học kì Summer 2026
+      if (item.type === 'class' || item.title.includes('học') || item.title.includes('FPTU')) {
+        // 1. Chỉ áp dụng đến hết tháng 7/2026 (sau 31/07/2026 sẽ tự động ẩn)
+        const limitDate = new Date(2026, 6, 31, 23, 59, 59); // Lưu ý: Tháng 7 trong JS là index 6
+        if (date > limitDate) return false;
+      }
+
+      // 2. Nghỉ ngơi cả tuần từ 6/7/2026 đến 12/7/2026 (không render bất kỳ lịch lặp lại nào)
+      const startBreak = new Date(2026, 6, 6, 0, 0, 0); // 6 tháng 7
+      const endBreak = new Date(2026, 6, 12, 23, 59, 59); // 12 tháng 7
+      if (date >= startBreak && date <= endBreak) return false;
+
+      return true;
+    }
+    return false;
   });
 
   const mapped: CEvent[] = dbToday.map(item => {
-    const startD = new Date(item.start_time);
-    const endD   = new Date(item.end_time);
+    const shDecimal = parseTimeToDecimal(item.start_time);
+    const ehDecimal = parseTimeToDecimal(item.end_time);
+
+    // Format sub-label hiển thị giờ
+    const startH = Math.floor(shDecimal);
+    const startM = Math.round((shDecimal - startH) * 60);
+    const endH = Math.floor(ehDecimal);
+    const endM = Math.round((ehDecimal - endH) * 60);
+
+    const formatTimePart = (h: number, m: number) => {
+      const suffix = h >= 12 ? 'CH' : 'SA';
+      const dispH = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      const dispM = m === 0 ? '' : `:${m < 10 ? '0' : ''}${m}`;
+      return `${dispH}${dispM} ${suffix}`;
+    };
+
+    const sub = `${formatTimePart(startH, startM)}–${formatTimePart(endH, endM)}`;
+
     return {
       title: item.title,
-      sub:   `${formatTime(startD.getHours(), startD.getMinutes())}–${formatTime(endD.getHours(), endD.getMinutes())}`,
-      type:  item.type === 'fitness' ? 'workout' : 'fixed',
-      sh:    parseTimeToHours(item.start_time),
-      eh:    parseTimeToHours(item.end_time),
-      col:   0,
-      cols:  1,
+      sub,
+      type: item.type === 'workout' ? 'workout' : 'fixed',
+      sh: shDecimal,
+      eh: ehDecimal,
+      col: 0,
+      cols: 1,
     };
   });
 
-  return [...fixed, ...mapped];
+  // Xử lý trùng lặp cột thông minh (overlapping columns)
+  for (let i = 0; i < mapped.length; i++) {
+    for (let j = i + 1; j < mapped.length; j++) {
+      const a = mapped[i];
+      const b = mapped[j];
+      const overlap = (a.sh < b.eh && a.eh > b.sh);
+      if (overlap) {
+        a.cols = 2;
+        b.cols = 2;
+        b.col = 1;
+      }
+    }
+  }
+
+  return mapped;
 }
 
 export function WeekCalendar({ weekDays, dbSchedules }: Props) {
   const calH = HOURS.length * PX_PER_H;
+  const [showAddModal, setShowAddModal] = useState(false);
 
   return (
-    <>
+    <div style={{ position: 'relative', flex: 1 }}>
       {/* ── Day headers ── */}
       <div style={{ display: 'flex', marginLeft: 52, marginBottom: 0, flexShrink: 0 }}>
         {weekDays.map(d => (
@@ -112,27 +177,87 @@ export function WeekCalendar({ weekDays, dbSchedules }: Props) {
                 const col    = ev.col ?? 0;
                 const cols   = ev.cols ?? 1;
                 const isFixed = ev.type === 'fixed';
+                
+                // Icon cho từng loại event
+                const getIcon = () => {
+                  if (ev.type === 'workout') return '🏋️';
+                  if (ev.type === 'fixed') return '🎓';
+                  return '📅';
+                };
+                
+                // Rút ngắn title thông minh
+                const getShortTitle = (title: string) => {
+                  if (title.length <= 12) return title;
+                  // Giữ từ đầu tiên + viết tắt
+                  const words = title.split(' ');
+                  if (words.length === 1) return title.substring(0, 10);
+                  return words[0] + ' ' + words.slice(1).map(w => w[0]).join('');
+                };
 
                 return (
-                  <div key={ei} style={{
-                    position: 'absolute',
-                    top: top + 1, height,
-                    left:  `${(col / cols) * 100}%`,
-                    width: `${(1 / cols) * 100 - 1}%`,
-                    borderRadius: 6,
-                    backgroundColor: isFixed ? 'rgba(229,62,62,0.14)' : 'rgba(255,92,0,0.12)',
-                    border:          isFixed ? '1px solid rgba(229,62,62,0.4)' : '1px solid rgba(255,92,0,0.45)',
-                    padding: '4px 6px', overflow: 'hidden', cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = isFixed ? 'rgba(229,62,62,0.22)' : 'rgba(255,92,0,0.2)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = isFixed ? 'rgba(229,62,62,0.14)' : 'rgba(255,92,0,0.12)'; }}
+                  <div
+                    key={ei}
+                    title={`${ev.title}\n${ev.sub || ''}`}
+                    style={{
+                      position: 'absolute',
+                      top: top + 1, height,
+                      left:  `${(col / cols) * 100}%`,
+                      width: `calc(${(1 / cols) * 100}% - 4px)`,
+                      borderRadius: 6,
+                      backgroundColor: isFixed ? 'rgba(229,62,62,0.14)' : 'rgba(255,92,0,0.12)',
+                      border:          isFixed ? '1px solid rgba(229,62,62,0.4)' : '1px solid rgba(255,92,0,0.45)',
+                      padding: '4px 6px',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = isFixed ? 'rgba(229,62,62,0.25)' : 'rgba(255,92,0,0.25)';
+                      e.currentTarget.style.transform = 'scale(1.03)';
+                      e.currentTarget.style.zIndex = '10';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = isFixed ? 'rgba(229,62,62,0.14)' : 'rgba(255,92,0,0.12)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.zIndex = '1';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   >
-                    <div style={{ color: isFixed ? '#F87171' : '#FFA066', fontSize: 10, fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {ev.title}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 3,
+                      minWidth: 0,
+                    }}>
+                      <span style={{ fontSize: 9, flexShrink: 0, lineHeight: 1 }}>{getIcon()}</span>
+                      <div style={{
+                        color: isFixed ? '#F87171' : '#FFA066',
+                        fontSize: height < 30 ? 9 : 10,
+                        fontWeight: 700,
+                        lineHeight: 1.2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1,
+                        minWidth: 0,
+                      }}>
+                        {height < 40 ? getShortTitle(ev.title) : ev.title}
+                      </div>
                     </div>
-                    {height > 25 && ev.sub && (
-                      <div style={{ color: isFixed ? 'rgba(248,113,113,0.75)' : 'rgba(255,160,102,0.8)', fontSize: 8.5, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {height > 35 && ev.sub && (
+                      <div style={{
+                        color: isFixed ? 'rgba(248,113,113,0.75)' : 'rgba(255,160,102,0.8)',
+                        fontSize: 8,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        minWidth: 0,
+                        lineHeight: 1.2,
+                      }}>
                         {ev.sub}
                       </div>
                     )}
@@ -143,6 +268,78 @@ export function WeekCalendar({ weekDays, dbSchedules }: Props) {
           );
         })}
       </div>
-    </>
+
+      {/* Modal - Coming soon */}
+      {showAddModal && (
+        <div
+          onClick={() => setShowAddModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: CARD,
+              borderRadius: 16,
+              padding: 24,
+              maxWidth: 400,
+              width: '90%',
+              border: `1px solid ${BORDER}`,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}
+          >
+            <h3 style={{ color: TEXT, fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
+              Thêm lịch mới 📅
+            </h3>
+            <p style={{ color: MUTED, fontSize: 13, marginBottom: 20 }}>
+              Tính năng này đang được phát triển! Hiện tại bạn có thể thêm lịch bằng cách:
+            </p>
+            <div style={{ color: TEXT, fontSize: 13, lineHeight: 1.8 }}>
+              <div style={{ marginBottom: 8 }}>
+                <strong style={{ color: ORANGE }}>💬 Chat với AI:</strong>
+                <br />
+                <span style={{ color: MUTED, fontSize: 12 }}>
+                  "Lên lịch tập gym 6h sáng mai"
+                </span>
+              </div>
+              <div>
+                <strong style={{ color: ORANGE }}>📱 Telegram Bot:</strong>
+                <br />
+                <span style={{ color: MUTED, fontSize: 12 }}>
+                  Nhắn tin cho tamquan bot
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowAddModal(false)}
+              style={{
+                marginTop: 20,
+                width: '100%',
+                padding: '10px',
+                borderRadius: 8,
+                backgroundColor: ORANGE,
+                border: 'none',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

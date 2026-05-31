@@ -11,8 +11,15 @@ interface ChatMessage {
   isUpdating?: boolean;
 }
 
-export function NutritionChat({ onUpdatePlan }: { onUpdatePlan: () => void }) {
-  const [isOpen, setIsOpen] = useState(false);
+export function NutritionChat({ 
+  isOpen, 
+  onClose,
+  onUpdatePlan 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onUpdatePlan: () => void; 
+}) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'm1', from: 'ai', text: 'Chào anh Quân! Mục tiêu hôm nay là 1600 kcal và 138g Đạm. Anh muốn ăn gì hôm nay để tôi lên thực đơn và đi chợ luôn?' }
@@ -26,63 +33,62 @@ export function NutritionChat({ onUpdatePlan }: { onUpdatePlan: () => void }) {
     }
   }, [messages, typing, isOpen]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
     const userMsg = input.trim();
     setMessages(p => [...p, { id: Date.now().toString(), from: 'user', text: userMsg }]);
     setInput('');
     setTyping(true);
 
-    // Giả lập AI suy nghĩ và sinh thực đơn
-    setTimeout(() => {
-      setTyping(false);
+    try {
+      const res = await fetch('/api/ai/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg })
+      });
+
+      if (!res.ok) throw new Error('API response failed');
+      const result = await res.json();
+
+      if (result.ok) {
+        setMessages(p => [...p, { 
+          id: Date.now().toString() + '_ai', 
+          from: 'ai', 
+          text: result.response_message,
+          isUpdating: result.action === 'meal_plan_week' || result.action === 'beer_buffer'
+        }]);
+        // Trigger UI update in parent to fetch fresh dynamic schedules, meal plans and groceries
+        onUpdatePlan();
+      } else {
+        throw new Error(result.error || 'Unknown error');
+      }
+    } catch (err) {
+      console.error('Lỗi gọi API AI Dinh dưỡng:', err);
       setMessages(p => [...p, { 
         id: Date.now().toString() + '_ai', 
         from: 'ai', 
-        text: 'Đã rõ! Tôi đã thiết kế lại thực đơn hôm nay có bún bò cho bữa trưa (chỉ ăn thịt, ít bún, nước dùng trong) và điều chỉnh lại calo bữa tối để bù trừ. Đã cập nhật luôn vào Danh sách đi chợ! Anh xem bên phải nhé. ✨',
-        isUpdating: true 
+        text: 'Hic cưng ơi, Gemini AI Dinh dưỡng bị trục trặc kết nối rồi! Gõ lại giùm chị nhé! 💅' 
       }]);
-      onUpdatePlan(); // Trigger UI update in parent
-    }, 2000);
+    } finally {
+      setTyping(false);
+    }
   };
-
-  if (!isOpen) {
-    return (
-      <div style={{
-        width: 60, height: '100%', borderRight: `1px solid ${BORDER}`,
-        background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(16px)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0',
-        transition: 'width 0.3s ease', flexShrink: 0,
-      }}>
-        <button 
-          onClick={() => setIsOpen(true)}
-          style={{
-            width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.05)',
-            border: `1px solid ${BORDER}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: TEXT, transition: 'all 0.2s', marginBottom: 20
-          }}
-        >
-          <ChevronRight size={20} />
-        </button>
-        
-        <div style={{
-          width: 40, height: 40, borderRadius: 12,
-          background: `linear-gradient(135deg, ${GREEN}, #16A34A)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: `0 0 16px rgba(34,197,94,0.4)`
-        }}>
-          <MessageSquare size={18} color="#fff" />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{
-      width: 380, height: '100%', borderRight: `1px solid ${BORDER}`,
-      background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(16px)',
-      display: 'flex', flexDirection: 'column', transition: 'width 0.3s ease',
-      flexShrink: 0
+      position: 'absolute',
+      top: 0,
+      left: isOpen ? 0 : -320,
+      width: 320, 
+      height: '100%', 
+      borderRight: `1px solid ${BORDER}`,
+      background: 'rgba(10,10,10,0.85)', 
+      backdropFilter: 'blur(16px)',
+      display: 'flex', 
+      flexDirection: 'column', 
+      transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      zIndex: 998,
+      boxShadow: isOpen ? '10px 0 30px rgba(0,0,0,0.5)' : 'none'
     }}>
       {/* Header */}
       <div style={{ padding: '20px 24px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -101,7 +107,7 @@ export function NutritionChat({ onUpdatePlan }: { onUpdatePlan: () => void }) {
           </div>
         </div>
         <button 
-          onClick={() => setIsOpen(false)}
+          onClick={onClose}
           style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: MUTED, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, borderRadius: 6 }}
         >
           <ChevronLeft size={20} />

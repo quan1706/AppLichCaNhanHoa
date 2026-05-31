@@ -2,11 +2,15 @@
 
 import { Task, TEXT, MUTED, BLUE, ORANGE, GREEN, BORDER } from './tasksUtils';
 
-export function TaskStats() {
+export function TaskStats({ tasks = [] }: { tasks?: Task[] }) {
+  const totalCount = tasks.length;
+  const urgentCount = tasks.filter(t => t.status !== 'done' && t.daysLeft <= 1).length;
+  const doneCount = tasks.filter(t => t.status === 'done').length;
+
   const stats = [
-    { label: 'Tổng', count: 7, sub: 'công việc', color: TEXT },
-    { label: 'Khẩn cấp', count: 1, sub: 'cần làm ngay', color: ORANGE },
-    { label: 'Đã xong', count: 2, sub: 'tuần này', color: GREEN },
+    { label: 'Tổng', count: totalCount, sub: 'công việc', color: TEXT },
+    { label: 'Khẩn cấp', count: urgentCount, sub: 'cần làm ngay', color: ORANGE },
+    { label: 'Đã xong', count: doneCount, sub: 'hoàn thành', color: GREEN },
   ];
 
   return (

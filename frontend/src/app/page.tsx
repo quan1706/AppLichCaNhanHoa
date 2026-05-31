@@ -148,6 +148,7 @@ export default function App() {
           </div>
         )}
       </div>
+      
       <Toaster richColors theme="dark" position="top-right" />
     </div>
   );

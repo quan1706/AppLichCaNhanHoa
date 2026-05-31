@@ -2,22 +2,36 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Groq from 'groq-sdk';
 
-// Initialize Supabase Client with service role key to bypass RLS at the server level
+// Initialize Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Initialize Groq Client
+// Initialize Groq
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY || '',
 });
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const QUAN_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
-const QUAN_UUID = '81552056-57ab-4cde-8f01-23456789abcd'; // Static UUID for Quan to sync Telegram and Web dashboard
+const QUAN_UUID = '81552056-57ab-4cde-8f01-23456789abcd'; // Static UUID for Quan
 
-// Helper to send message back to Telegram
-async function sendTelegramMessage(chatId: string, text: string) {
+// ----------------------------------------------------------------------
+// CẤU HÌNH BÀN PHÍM
+// ----------------------------------------------------------------------
+const defaultKeyboard = {
+  keyboard: [
+    [{ text: '📅 Lịch hôm nay' }, { text: '⏰ Deadline hôm nay' }],
+    [{ text: '🥗 Thực đơn hôm nay' }, { text: '📊 Tổng quan hôm nay' }]
+  ],
+  resize_keyboard: true,
+  is_persistent: true
+};
+
+// ----------------------------------------------------------------------
+// HÀM GỬI TIN NHẮN TELEGRAM
+// ----------------------------------------------------------------------
+async function sendTelegramMessage(chatId: string, text: string, replyMarkup: any = defaultKeyboard) {
   try {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
     const res = await fetch(url, {
@@ -29,6 +43,7 @@ async function sendTelegramMessage(chatId: string, text: string) {
         chat_id: chatId,
         text: text,
         parse_mode: 'HTML',
+        reply_markup: replyMarkup
       }),
     });
     if (!res.ok) {
@@ -39,180 +54,309 @@ async function sendTelegramMessage(chatId: string, text: string) {
   }
 }
 
+// ----------------------------------------------------------------------
+// HELPER: LẤY GIỜ VIỆT NAM
+// ----------------------------------------------------------------------
+function getVietnamTimeInfo() {
+  const now = new Date();
+  const currentIctOffset = 7 * 60 * 60 * 1000;
+  const vietnamTime = new Date(now.getTime() + currentIctOffset);
+  const timeString = vietnamTime.toISOString();
+  const dayOfWeekNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  const currentDayName = dayOfWeekNames[vietnamTime.getUTCDay()];
+  const todayStr = timeString.split('T')[0];
+  const dayOfWeek = vietnamTime.getUTCDay(); // Sửa lỗi ở đây: Phải dùng getUTCDay thay vì getDay
+  
+  return { vietnamTime, timeString, currentDayName, todayStr, dayOfWeek };
+}
+
+// ----------------------------------------------------------------------
+// API HANDLER MAIN
+// ----------------------------------------------------------------------
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     console.log('--- RECEIVED TELEGRAM WEBHOOK ---', JSON.stringify(body));
 
-    // Support standard webhook message updates
     if (!body.message || !body.message.text) {
       return NextResponse.json({ ok: true });
     }
 
     const chatId = String(body.message.chat.id);
     const messageText = body.message.text.trim();
-    const username = body.message.from.first_name || 'Quân';
 
-    // 1. Authorization: Only allow Quan to communicate with this bot
+    // 1. Phân quyền
     if (chatId !== QUAN_CHAT_ID) {
-      console.log(`Unauthorized user attempted to chat: ${chatId}`);
-      await sendTelegramMessage(
-        chatId,
-        `❌ <b>CẢNH BÁO XÂM NHẬP!</b>\n\nỦa cưng là ai thế? Chị chỉ phục vụ đại ca <b>Nguyễn Tam Quân</b> (mập 92kg đang giảm cân) thôi nhé! Xéo đi chỗ khác chơi không chị block bây giờ! 💅`
-      );
+      await sendTelegramMessage(chatId, `❌ <b>CẢNH BÁO XÂM NHẬP!</b>\n\nChị chỉ phục vụ đại ca <b>Nguyễn Tam Quân</b> thôi nhé! Xéo đi! 💅`, { remove_keyboard: true });
       return NextResponse.json({ ok: true });
     }
 
-    // 2. Ensure Quan has a profile in Supabase
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', QUAN_UUID)
-      .single();
+    // 2. Lấy thông tin thời gian
+    const { vietnamTime, timeString, currentDayName, todayStr, dayOfWeek } = getVietnamTimeInfo();
 
-    if (profileError && profileError.code === 'PGRST116') {
-      // Profile does not exist, create a default profile for Quan
-      console.log('Profile for Quan does not exist. Creating default profile...');
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert({
-          id: QUAN_UUID,
-          current_weight: 92.0,
-          target_weight: 78.0,
-          daily_water_goal: 3500.0,
-          daily_calorie_goal: 1600.0,
-          daily_protein_goal: 130.0,
+    // ----------------------------------------------------------------------
+    // LUỒNG 1: XỬ LÝ NHANH 4 NÚT BẤM (KHÔNG DÙNG AI ĐỂ TIẾT KIỆM TOKEN)
+    // ----------------------------------------------------------------------
+    if (messageText === '📅 Lịch hôm nay') {
+      const { data: schedData } = await supabase.from('schedules').select('*').eq('profile_id', QUAN_UUID)
+        .or(`specific_date.eq.${todayStr},days.cs.{${dayOfWeek}}`);
+      const todaySchedules = (schedData || []).filter((s: any) => !s.specific_date || s.specific_date === todayStr)
+        .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time));
+      
+      let msg = `🗓 <b>Lịch trình hôm nay (${todayStr}):</b>\n\n`;
+      if (todaySchedules.length > 0) {
+        todaySchedules.forEach((s: any) => {
+          const timeStr = s.start_time.substring(0, 5) + (s.end_time ? ' - ' + s.end_time.substring(0, 5) : '');
+          let icon = s.type === 'workout' ? '🏋️‍♂️' : (s.type === 'class' ? '📚' : '💻');
+          msg += `${icon} <b>${timeStr}:</b> ${s.title}\n`;
         });
-
-      if (insertError) {
-        console.error('Failed to create default profile:', insertError);
+      } else {
+        msg += `<i>Trống trơn! Rảnh rỗi thế? Tập thể dục đi! 💅</i>\n`;
       }
+      await sendTelegramMessage(chatId, msg);
+      return NextResponse.json({ ok: true });
+    }
+    
+    if (messageText === '⏰ Deadline hôm nay') {
+      const startOfToday = new Date(vietnamTime); startOfToday.setUTCHours(0,0,0,0);
+      const { data: deadlineData } = await supabase.from('deadlines').select('*').eq('user_id', QUAN_UUID)
+        .eq('status', 'pending').gte('due_date', startOfToday.toISOString());
+      
+      let msg = `⏰ <b>Deadline chưa nộp:</b>\n\n`;
+      if (deadlineData && deadlineData.length > 0) {
+        deadlineData.forEach((d: any) => {
+          const dueDate = new Date(d.due_date);
+          const formattedDate = `${String(dueDate.getHours()).padStart(2,'0')}:${String(dueDate.getMinutes()).padStart(2,'0')} ${String(dueDate.getDate()).padStart(2,'0')}/${String(dueDate.getMonth()+1).padStart(2,'0')}`;
+          msg += `⚠️ <b>${formattedDate}:</b> ${d.title}\n`;
+        });
+        msg += `\n<i>Lo mà làm đi, sắp toang rồi! 💅</i>`;
+      } else {
+        msg += `<i>Bình yên, không nợ môn nào. Ngủ ngon!</i>\n`;
+      }
+      await sendTelegramMessage(chatId, msg);
+      return NextResponse.json({ ok: true });
     }
 
-    // Get current date & time in Vietnam (ICT, GMT+7) for Groq NLP parser reference
-    const now = new Date();
-    // Offset for GMT+7
-    const currentIctOffset = 7 * 60 * 60 * 1000;
-    const vietnamTime = new Date(now.getTime() + currentIctOffset);
-    const timeString = vietnamTime.toISOString();
-    const dayOfWeekNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-    const currentDayName = dayOfWeekNames[vietnamTime.getUTCDay()];
+    if (messageText === '🥗 Thực đơn hôm nay') {
+      const { data: mealData } = await supabase.from('ai_fitness_plan').select('*').eq('date', todayStr).single();
+      let msg = `🥗 <b>Thực đơn hôm nay (${todayStr}):</b>\n\n`;
+      if (mealData) {
+        msg += `🍳 Sáng: ${mealData.meal_breakfast || 'Chưa xếp'}\n`;
+        msg += `🍱 Trưa: ${mealData.meal_lunch || 'Chưa xếp'}\n`;
+        msg += `🥙 Xế: ${mealData.meal_snack || 'Chưa xếp'}\n`;
+        msg += `🍲 Tối: ${mealData.meal_dinner || 'Chưa xếp'}\n`;
+      } else {
+        msg += `<i>Chưa có thực đơn cho hôm nay. Dùng lệnh /anuong để chị xếp cho nhé! 💅</i>\n`;
+      }
+      await sendTelegramMessage(chatId, msg);
+      return NextResponse.json({ ok: true });
+    }
 
-    console.log(`Current Time (ICT) Reference for Groq: ${timeString} (${currentDayName})`);
+    if (messageText === '📊 Tổng quan hôm nay' || messageText.toLowerCase() === 'tổng quan hôm nay') {
+      // (This uses the logic we built previously, simplified)
+      const startOfToday = new Date(vietnamTime); startOfToday.setUTCHours(0,0,0,0);
+      
+      const { data: waterData } = await supabase.from('water_tracking').select('amount')
+        .eq('user_id', QUAN_UUID).gte('created_at', startOfToday.toISOString()).lte('created_at', new Date(startOfToday.getTime() + 24*60*60*1000).toISOString());
+      const totalWater = (waterData || []).reduce((sum, row) => sum + row.amount, 0);
+      const waterPercent = Math.min(100, Math.round((totalWater / 3500) * 100));
 
-    // 3. Use Groq to parse natural language message
-    const systemPrompt = `
-Bạn là tamquan, một trợ lý nữ ảo cực kỳ đanh đá, sắc sảo, nghiêm khắc nhưng hài hước và châm biếm thực tế. 
-Nhiệm vụ của bạn là giúp người dùng tên "Quân" (hiện tại nặng 92kg, mục tiêu giảm xuống 78kg, học tại FPTU) quản lý uống nước, lịch biểu và deadline bài tập.
+      const { data: mealData } = await supabase.from('ai_fitness_plan').select('*').eq('date', todayStr).single();
+      
+      const { data: schedData } = await supabase.from('schedules').select('*').eq('profile_id', QUAN_UUID)
+        .or(`specific_date.eq.${todayStr},days.cs.{${dayOfWeek}}`);
+      const todaySchedules = (schedData || []).filter((s: any) => !s.specific_date || s.specific_date === todayStr)
+        .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time));
 
-THÔNG TIN BỐI CẢNH THỜI GIAN THỰC TẾ (HÃY DÙNG LÀM MỐC SO SÁNH):
-- Thời gian hiện tại ở Việt Nam: ${timeString}
-- Hôm nay là ngày thứ: ${currentDayName}
+      const { data: deadlineData } = await supabase.from('deadlines').select('*').eq('user_id', QUAN_UUID)
+        .eq('status', 'pending').gte('due_date', startOfToday.toISOString());
 
-PHÂN TÍCH TIN NHẮN CỦA QUÂN:
-Bạn hãy phân tích tin nhắn của Quân và xác định hành động của anh ấy. Bạn PHẢI trả về một chuỗi JSON hợp lệ (không chứa block markdown \`\`\`json) có cấu trúc như sau:
+      let dashboardMsg = `<b>📊 BÁO CÁO TỔNG QUAN (${todayStr})</b>\n\n`;
+      dashboardMsg += `💧 <b>Nước uống:</b> ${totalWater}ml / 3500ml (${waterPercent}%)\n\n`;
+      
+      dashboardMsg += `🥗 <b>Thực đơn:</b>\n`;
+      if (mealData) {
+        dashboardMsg += `Sáng: ${mealData.meal_breakfast || '-'}\nTrưa: ${mealData.meal_lunch || '-'}\nTối: ${mealData.meal_dinner || '-'}\n\n`;
+      } else dashboardMsg += `<i>(Chưa lên)</i>\n\n`;
 
+      dashboardMsg += `🗓 <b>Lịch trình:</b>\n`;
+      if (todaySchedules.length > 0) {
+        todaySchedules.forEach((s: any) => { dashboardMsg += `• ${s.start_time.substring(0,5)}: ${s.title}\n`; });
+      } else dashboardMsg += `<i>(Trống)</i>\n`;
+      dashboardMsg += '\n';
+
+      dashboardMsg += `⏰ <b>Deadline:</b>\n`;
+      if (deadlineData && deadlineData.length > 0) {
+        dashboardMsg += `Còn ${deadlineData.length} deadline đang chờ nộp.\n`;
+      } else dashboardMsg += `<i>(Trống)</i>\n`;
+
+      await sendTelegramMessage(chatId, dashboardMsg);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ----------------------------------------------------------------------
+    // LUỒNG 2: XỬ LÝ THEO LỆNH (COMMAND ROUTER) BẰNG AI GROQ
+    // ----------------------------------------------------------------------
+    
+    // Nếu tin nhắn bắt đầu bằng /tuvan -> Agent Tư Vấn (Text Mode, No JSON)
+    if (messageText.startsWith('/tuvan')) {
+      const promptTuVan = `
+Bạn là tamquan, một chuyên gia/PT tư vấn sức khỏe, tập luyện và giảm cân khắt khe.
+Nhiệm vụ: Chỉ giải đáp các vấn đề về sức khỏe, tập luyện, calo.
+NGHIÊM CẤM: Trả lời lan man các chủ đề khác (ví dụ code, lịch sử, toán học...). Nếu hỏi sai chủ đề, chửi và từ chối.
+QUY TẮC: Trả lời CỰC KỲ NGẮN GỌN, tối đa 100 chữ, đi thẳng vào vấn đề để tiết kiệm token. Giọng điệu xéo xắt, gọi "Quân" hoặc "cưng".`;
+      
+      const completion = await groq.chat.completions.create({
+        messages: [
+          { role: 'system', content: promptTuVan },
+          { role: 'user', content: messageText.replace('/tuvan', '').trim() },
+        ],
+        model: 'llama-3.3-70b-versatile',
+      });
+      const responseText = completion.choices[0]?.message?.content || 'Chị đang mệt, tí hỏi lại nha cưng.';
+      await sendTelegramMessage(chatId, responseText);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Nếu tin nhắn bắt đầu bằng /lich -> Agent Lịch Trình (JSON Mode)
+    if (messageText.startsWith('/lich')) {
+      const promptLich = `
+Bạn là tamquan, trợ lý đanh đá quản lý lịch trình.
+Hiện tại là: ${timeString} (${currentDayName}).
+Phân tích yêu cầu LỊCH TRÌNH của Quân (thêm/xóa) và trả về JSON chuẩn xác:
 {
-  "action": "water" | "schedule" | "deadline" | "chat",
+  "action": "add_schedule" hoặc "delete_schedule" hoặc "add_deadline",
   "data": {
-    // Nếu action là "water":
-    "amount": number, // lượng nước uống nạp vào (ml), ví dụ 250, 500, 1000. Nếu không có số, mặc định 250.
-    
-    // Nếu action là "schedule":
-    "title": "tên sự kiện",
-    "event_type": "academic" | "work" | "social" | "fitness",
-    "start_time": "ISO TIMESTAMP WITH TIMEZONE (ICT +07:00)", // Thời gian bắt đầu sự kiện
-    "end_time": "ISO TIMESTAMP WITH TIMEZONE (ICT +07:00)", // Thời gian kết thúc sự kiện (nếu không nói cụ thể, cộng thêm 1 tiếng từ start_time)
-    
-    // Nếu action là "deadline":
-    "title": "tên môn học / bài tập",
-    "due_date": "ISO TIMESTAMP WITH TIMEZONE (ICT +07:00)" // Hạn chót nộp bài
+     // Nếu add_schedule
+     "title": "tên sự kiện",
+     "event_type": "academic" | "work" | "social" | "fitness",
+     "start_time": "ISO TIMESTAMP WITH TIMEZONE (ICT +07:00)",
+     "end_time": "ISO TIMESTAMP WITH TIMEZONE (ICT +07:00)",
+     
+     // Nếu delete_schedule (xóa theo từ khóa tên)
+     "title_keyword": "từ khóa tên sự kiện cần xóa",
+     
+     // Nếu add_deadline
+     "title": "tên deadline",
+     "due_date": "ISO TIMESTAMP WITH TIMEZONE (ICT +07:00)"
   },
-  "response_message": "Câu trả lời của bạn gửi lại cho Quân"
-}
+  "response_message": "Câu chửi/khen xéo xắt xác nhận đã xử lý"
+}`;
+      const completion = await groq.chat.completions.create({
+        messages: [
+          { role: 'system', content: promptLich },
+          { role: 'user', content: messageText.replace('/lich', '').trim() },
+        ],
+        model: 'llama-3.3-70b-versatile',
+        response_format: { type: 'json_object' },
+      });
+      const aiResponse = JSON.parse(completion.choices[0]?.message?.content || '{}');
+      
+      // Xử lý Database
+      if (aiResponse.action === 'add_schedule' && aiResponse.data?.title) {
+        const d = aiResponse.data;
+        const startDate = new Date(d.start_time);
+        const endDate = d.end_time ? new Date(d.end_time) : new Date(startDate.getTime() + 60*60*1000);
+        const startTime = `${String(startDate.getHours()).padStart(2,'0')}:${String(startDate.getMinutes()).padStart(2,'0')}:00`;
+        const endTime = `${String(endDate.getHours()).padStart(2,'0')}:${String(endDate.getMinutes()).padStart(2,'0')}:00`;
+        
+        let scheduleType = 'class';
+        if (d.event_type === 'work') scheduleType = 'work';
+        else if (d.event_type === 'fitness' || d.event_type === 'social') scheduleType = 'workout';
+        
+        await supabase.from('schedules').insert({
+          profile_id: QUAN_UUID,
+          title: d.title,
+          type: scheduleType,
+          days: [startDate.getDay()],
+          start_time: startTime,
+          end_time: endTime,
+          shift: startDate.getHours() < 12 ? 'morning' : 'afternoon',
+          specific_date: startDate.toISOString().split('T')[0]
+        });
+      } else if (aiResponse.action === 'delete_schedule' && aiResponse.data?.title_keyword) {
+        await supabase.from('schedules').delete()
+          .eq('profile_id', QUAN_UUID)
+          .ilike('title', `%${aiResponse.data.title_keyword}%`);
+      } else if (aiResponse.action === 'add_deadline' && aiResponse.data?.title) {
+        await supabase.from('deadlines').insert({
+          user_id: QUAN_UUID, title: aiResponse.data.title, due_date: aiResponse.data.due_date, status: 'pending'
+        });
+      }
+      
+      await sendTelegramMessage(chatId, aiResponse.response_message || 'Xong rồi cưng!');
+      return NextResponse.json({ ok: true });
+    }
 
-QUY TẮC CÂU THOẠI PHẢN HỒI (response_message):
-- Luôn gọi người dùng là "Quân" hoặc "cưng", tự xưng là "chị" hoặc "tamquan".
-- Giọng điệu đanh đá, xéo sắc, châm biếm, nghiêm khắc để đôn đốc kỷ luật.
-- Nếu Quân báo UỐNG NƯỚC: khen ngợi một cách châm biếm ("Biết khát rồi hả cưng? Uống đi cho bớt mỡ!", "Chị ghi nhận nạp thêm {amount}ml rồi đấy, lo mà uống đủ 3500ml đi kẻo thành heo đất!").
-- Nếu Quân báo LỊCH TRÌNH / DEADLINE: nhắc nhở né giờ học FPTU, giờ làm việc và nhắc nhở phải kỷ luật, không được lười biếng.
-- Nếu Quân CHAT THÔNG THƯỜNG: trò chuyện sắc sảo, châm chọc việc béo 92kg, lười tập thể dục hoặc lười học. Luôn lôi các chỉ số cân nặng, đạm (110g-138g/ngày) và calo thâm hụt (mục tiêu 1600kcal) ra kháy khía một cách khôi hài để kích thích động lực.
+    // Nếu tin nhắn bắt đầu bằng /anuong -> Agent Dinh Dưỡng (JSON Mode)
+    if (messageText.startsWith('/anuong')) {
+      const promptAnUong = `
+Bạn là tamquan, chuyên gia dinh dưỡng đanh đá cho Quân (92kg).
+Hiện tại là: ${timeString} (${currentDayName}).
+Dựa vào yêu cầu, tạo hoặc điều chỉnh thực đơn MỚI cho hôm nay (${todayStr}) (luôn ưu tiên ức gà, khoai lang, chuối tiêu, ổi giòn, sữa chua).
+Trả về JSON chuẩn xác:
+{
+  "action": "nutrition",
+  "data": {
+    "meal_breakfast": "món ăn (gram cụ thể)",
+    "meal_lunch": "món ăn (gram cụ thể)",
+    "meal_snack": "món ăn (gram cụ thể)",
+    "meal_dinner": "món ăn (gram cụ thể)"
+  },
+  "response_message": "Câu chửi/khen xéo xắt xác nhận thực đơn"
+}`;
+      const completion = await groq.chat.completions.create({
+        messages: [
+          { role: 'system', content: promptAnUong },
+          { role: 'user', content: messageText.replace('/anuong', '').trim() },
+        ],
+        model: 'llama-3.3-70b-versatile',
+        response_format: { type: 'json_object' },
+      });
+      const aiResponse = JSON.parse(completion.choices[0]?.message?.content || '{}');
+      
+      // Xử lý Database Upsert
+      if (aiResponse.action === 'nutrition' && aiResponse.data) {
+        // Find existing to upsert or just upsert using Date as PK/Unique if it exists. 
+        // We will query first:
+        const { data: existingMeal } = await supabase.from('ai_fitness_plan').select('id').eq('date', todayStr).single();
+        if (existingMeal) {
+          await supabase.from('ai_fitness_plan').update({
+            meal_breakfast: aiResponse.data.meal_breakfast,
+            meal_lunch: aiResponse.data.meal_lunch,
+            meal_snack: aiResponse.data.meal_snack,
+            meal_dinner: aiResponse.data.meal_dinner
+          }).eq('id', existingMeal.id);
+        } else {
+          await supabase.from('ai_fitness_plan').insert({
+            date: todayStr,
+            meal_breakfast: aiResponse.data.meal_breakfast,
+            meal_lunch: aiResponse.data.meal_lunch,
+            meal_snack: aiResponse.data.meal_snack,
+            meal_dinner: aiResponse.data.meal_dinner,
+            fitness_advice: 'Giữ kỷ luật tập luyện nhé!'
+          });
+        }
+      }
+      
+      await sendTelegramMessage(chatId, aiResponse.response_message || 'Chị xếp xong thực đơn rồi, hốc ít thôi! 💅');
+      return NextResponse.json({ ok: true });
+    }
+
+    // ----------------------------------------------------------------------
+    // LUỒNG 3: FALLBACK TRỢ GIÚP (NẾU KHÔNG CÓ LỆNH)
+    // ----------------------------------------------------------------------
+    const fallbackMessage = `
+Ê cưng! Muốn nhờ chị làm gì thì gõ đúng lệnh nha:
+- Chỉnh lịch/deadline: <b>/lich [nội dung]</b>
+- Xin thực đơn: <b>/anuong [nội dung]</b>
+- Hỏi đáp gym/sức khỏe: <b>/tuvan [câu hỏi]</b>
+
+<i>Hoặc là cưng bấm mấy cái nút bên dưới đi cho lẹ, đừng bắt chị đoán ý! 💅</i>
 `;
+    await sendTelegramMessage(chatId, fallbackMessage);
 
-    const completion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: messageText },
-      ],
-      model: 'llama-3.3-70b-versatile',
-      response_format: { type: 'json_object' },
-    });
-
-    const aiResponseText = completion.choices[0]?.message?.content || '{}';
-    console.log('Groq Parser Result Raw:', aiResponseText);
-    
-    let parsedResult;
-    try {
-      parsedResult = JSON.parse(aiResponseText);
-    } catch (e) {
-      console.error('Failed to parse Groq response:', e);
-      parsedResult = {
-        action: 'chat',
-        response_message: 'Hic cưng ơi, mạng Groq bị sao ý làm đầu chị quay cuồng luôn rồi. Nói lại chị nghe xem nào! 💅',
-      };
-    }
-
-    const { action, data, response_message } = parsedResult;
-
-    // 4. Execute action and save to Supabase Database
-    if (action === 'water' && data && data.amount) {
-      console.log(`Ghi nhận uống nước: ${data.amount} ml`);
-      const { error: dbError } = await supabase
-        .from('water_tracking')
-        .insert({
-          user_id: QUAN_UUID,
-          amount: Number(data.amount),
-        });
-
-      if (dbError) {
-        console.error('Error inserting water tracking:', dbError);
-      }
-    } else if (action === 'schedule' && data && data.title && data.start_time) {
-      console.log(`Ghi nhận lịch trình: ${data.title} (${data.start_time} - ${data.end_time})`);
-      const { error: dbError } = await supabase
-        .from('schedules')
-        .insert({
-          user_id: QUAN_UUID,
-          title: data.title,
-          type: data.event_type || 'academic',
-          start_time: data.start_time,
-          end_time: data.end_time || new Date(new Date(data.start_time).getTime() + 60 * 60 * 1000).toISOString(),
-          is_fixed: false, // New schedules added through AI are dynamic/not fixed unless specified
-        });
-
-      if (dbError) {
-        console.error('Error inserting schedule:', dbError);
-      }
-    } else if (action === 'deadline' && data && data.title && data.due_date) {
-      console.log(`Ghi nhận deadline: ${data.title} hạn ${data.due_date}`);
-      const { error: dbError } = await supabase
-        .from('deadlines')
-        .insert({
-          user_id: QUAN_UUID,
-          title: data.title,
-          due_date: data.due_date,
-          status: 'pending',
-        });
-
-      if (dbError) {
-        console.error('Error inserting deadline:', dbError);
-      }
-    }
-
-    // 5. Reply back to Quan on Telegram
-    await sendTelegramMessage(chatId, response_message);
-
-    return NextResponse.json({ ok: true, action, data, response_message });
+    return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error('CRITICAL ERROR IN WEBHOOK HANDLER:', error);
     return NextResponse.json({ ok: false, error: error.message });

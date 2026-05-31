@@ -1,41 +1,247 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Filter, Plus, X, Link as LinkIcon, FileText, UploadCloud, Users } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase, QUAN_UUID } from '../../lib/supabaseClient';
 import { BG, BLUE, TEXT, MUTED, Task, ORANGE, BORDER } from './tasksUtils';
 import { TaskStats } from './TaskStats';
 import { TaskRow } from './TaskRow';
 import { TaskSidebar } from './TaskSidebar';
 
-const MOCK_TASKS: Task[] = [
-  { id: 't1', code: 'SE17B01', name: 'Kỹ thuật phần mềm – Bài tập 3',       course: 'SE17B01', due: '01/06/2026', daysLeft: 1,  status: 'pending', link: 'https://docs.google.com/...' },
-  { id: 't2', code: 'SE17B03', name: 'Báo cáo Lab – Kiểm thử hệ thống',     course: 'SE17B01', due: '04/06/2026', daysLeft: 4,  status: 'pending' },
-  { id: 't3', code: 'PRM392',  name: 'Dự án di động – Demo Sprint 2',        course: 'PRM392',  due: '08/06/2026', daysLeft: 8,  status: 'pending', starred: true },
-  { id: 't4', code: 'MAD101',  name: 'Toán học cho CNTT – Bài kiểm tra 3',  course: 'MAD101',  due: '12/06/2026', daysLeft: 12, status: 'pending' },
-  { id: 't5', code: 'PRJ301',  name: 'Demo dự án nhóm – Bảo vệ cuối kỳ',   course: 'PRJ301',  due: '15/06/2026', daysLeft: 15, status: 'pending' },
-  { id: 't6', code: 'SSB301',  name: 'Kỹ năng doanh nghiệp – Case Study',   course: 'SSB301',  due: '18/06/2026', daysLeft: 18, status: 'done' },
-  { id: 't7', code: 'NLP302',  name: 'Xử lý ngôn ngữ – Bản nháp nghiên cứu', course: 'NLP302', due: '22/06/2026', daysLeft: 22, status: 'done' },
-];
+// Helper to parse Supabase tasks data to UI Task structure
+function mapDbDeadlineToTask(db: any): Task {
+  const title = db.title || '';
+  const category = db.category || 'Chung';
+  const code = category.toUpperCase().trim();
+  const name = title;
+
+  // Calculate days left
+  const dueTime = new Date(db.deadline).getTime();
+  const nowTime = new Date().getTime();
+  const diffDays = Math.ceil((dueTime - nowTime) / (1000 * 60 * 60 * 24));
+
+  // Format due date to localized Vietnamese format
+  const dateObj = new Date(db.deadline);
+  const dueFormatted = dateObj.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  return {
+    id: db.id,
+    code,
+    name,
+    course: code,
+    due: dueFormatted,
+    daysLeft: isNaN(diffDays) ? 0 : diffDays,
+    status: db.is_done ? 'done' : 'pending',
+    starred: !!db.is_starred,
+    notes: '',
+  };
+}
 
 export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void }) {
-  const [checked, setChecked] = useState<Record<string, boolean>>({ t6: true, t7: true });
-  const [starred, setStarred] = useState<Record<string, boolean>>({ t3: true });
+  // App Data States
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState<Record<string, boolean>>({ academic: true, work: true, fitness: true });
+  
+  // Add Task Modal Form States
   const [showAddModal, setShowAddModal] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newLink, setNewLink] = useState('');
+  const [newNotes, setNewNotes] = useState('');
+  const [newIsStarred, setNewIsStarred] = useState(false);
+  const [newSubmissionType, setNewSubmissionType] = useState<'CMS' | 'class'>('CMS');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const toggleTask = (id: string) => setChecked(p => ({ ...p, [id]: !p[id] }));
-  const toggleStar = (id: string) => setStarred(p => ({ ...p, [id]: !p[id] }));
   const toggleFilter = (id: string) => setFilters(p => ({ ...p, [id]: !p[id] }));
 
-  const sortedTasks = [...MOCK_TASKS].sort((a, b) => {
-    const aDone = a.status === 'done' || checked[a.id];
-    const bDone = b.status === 'done' || checked[b.id];
+  // 1. Fetch Tasks
+  const fetchTasks = async () => {
+    setIsLoading(true);
+    try {
+      const { data: dbTasks, error: taskErr } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('profile_id', QUAN_UUID)
+        .order('deadline', { ascending: true });
+
+      if (taskErr) throw taskErr;
+
+      const { data: fitnessPlans, error: fitErr } = await supabase
+        .from('ai_fitness_plan')
+        .select('*')
+        .order('date', { ascending: true });
+
+      if (fitErr) throw fitErr;
+
+      let allTasks: Task[] = [];
+      if (dbTasks) {
+        allTasks = dbTasks.map(mapDbDeadlineToTask);
+      }
+
+      if (fitnessPlans) {
+        fitnessPlans.forEach(plan => {
+           if (plan.workout_schedule) {
+              const match = plan.workout_schedule.match(/^(\d{2}:\d{2})/);
+              const timeStr = match ? match[1] : '17:00';
+              const dateTime = new Date(`${plan.date}T${timeStr}:00`).toISOString();
+              
+              const dueTime = new Date(dateTime).getTime();
+              const nowTime = new Date().getTime();
+              const diffDays = Math.ceil((dueTime - nowTime) / (1000 * 60 * 60 * 24));
+
+              const dateObj = new Date(dateTime);
+              const dueFormatted = dateObj.toLocaleString('vi-VN', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+              });
+
+              allTasks.push({
+                id: `workout_${plan.id}`,
+                code: 'FITNESS',
+                name: plan.workout_schedule,
+                course: 'FITNESS',
+                due: dueFormatted,
+                daysLeft: isNaN(diffDays) ? 0 : diffDays,
+                status: 'pending',
+                starred: true,
+                notes: 'AI Fitness Schedule',
+              });
+           }
+        });
+      }
+      
+      setTasks(allTasks);
+
+    } catch (err) {
+      console.error('Lỗi nạp dữ liệu:', err);
+      toast.error('Không thể tải danh sách công việc! 💅');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  // 2. Toggle Task Complete Status
+  const toggleTask = async (id: string) => {
+    if (id.startsWith('workout_')) {
+      toast.info('Lịch tập do AI lên, không thể đánh dấu tại đây! 💪');
+      return;
+    }
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const newStatus = task.status === 'done' ? 'pending' : 'done';
+    const isDone = newStatus === 'done';
+
+    // Optimistic UI Update
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ is_done: isDone })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success(isDone ? 'Chúc mừng! Đã hoàn thành công việc! 🎉' : 'Đã đưa công việc về trạng thái chưa làm.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi đồng bộ dữ liệu!');
+      // Rollback on failure
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, status: task.status } : t));
+    }
+  };
+
+  // 3. Toggle Star/Priority Status
+  const toggleStar = async (id: string) => {
+    if (id.startsWith('workout_')) return;
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const newStarred = !task.starred;
+
+    // Optimistic UI Update
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, starred: newStarred } : t));
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ is_starred: newStarred })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success(newStarred ? 'Đã thêm sao ưu tiên cho công việc! 🌟' : 'Đã bỏ sao ưu tiên.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi đồng bộ mức độ ưu tiên!');
+      // Rollback on failure
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, starred: task.starred } : t));
+    }
+  };
+
+  // 4. Create Task
+  const handleAddTask = async () => {
+    if (!newTitle.trim()) {
+      toast.error('Vui lòng nhập tên công việc!');
+      return;
+    }
+    if (!newDueDate) {
+      toast.error('Vui lòng chọn thời gian hạn chót!');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('tasks').insert({
+        profile_id: QUAN_UUID,
+        title: newTitle.trim(),
+        category: newCategory.trim() || 'Chung',
+        deadline: new Date(newDueDate).toISOString(),
+        is_done: false,
+        is_starred: newIsStarred,
+      });
+
+      if (error) throw error;
+      toast.success('Đã lên lịch deadline mới thành công! 🚀');
+      setShowAddModal(false);
+      
+      // Reset form controls
+      setNewTitle('');
+      setNewCategory('');
+      setNewDueDate('');
+      setNewLink('');
+      setNewNotes('');
+      setNewIsStarred(false);
+
+      // Reload
+      fetchTasks();
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi kết nối cơ sở dữ liệu khi tạo Task!');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const aDone = a.status === 'done';
+    const bDone = b.status === 'done';
 
     if (aDone && !bDone) return 1;
     if (!aDone && bDone) return -1;
 
-    const aStar = starred[a.id];
-    const bStar = starred[b.id];
+    const aStar = a.starred;
+    const bStar = b.starred;
 
     if (aStar && !bStar) return -1;
     if (!aStar && bStar) return 1;
@@ -46,6 +252,22 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: BG, overflow: 'hidden', fontFamily: 'Inter,sans-serif', position: 'relative' }}>
       
+      {/* Dynamic spinner CSS */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .premium-spinner {
+          width: 32px;
+          height: 32px;
+          border: 3px solid rgba(96, 165, 250, 0.1);
+          border-radius: 50%;
+          border-top-color: #60A5FA;
+          animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}} />
+
       {/* ── Header ── */}
       <div style={{
         padding: '20px 28px', flexShrink: 0, background: 'rgba(10,10,10,0.9)', backdropFilter: 'blur(16px)',
@@ -86,7 +308,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
         
         {/* Task List */}
         <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
-          <TaskStats />
+          <TaskStats tasks={tasks} />
 
           {/* Table headers */}
           <div style={{
@@ -97,18 +319,31 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
             <div /> <div>Công việc</div> <div>Môn học</div> <div>Hạn chót</div> <div>Trạng thái</div> <div style={{ textAlign: 'center' }}>Ưu tiên</div>
           </div>
 
-          {/* Table rows */}
-          {sortedTasks.map((task, idx) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              idx={idx}
-              isDone={task.status === 'done' || !!checked[task.id]}
-              isStarred={!!starred[task.id]}
-              onToggle={toggleTask}
-              onToggleStar={toggleStar}
-            />
-          ))}
+          {/* Dynamic Content Loader */}
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '60px 0', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="premium-spinner" />
+              <span style={{ color: MUTED, fontSize: 12 }}>Đang đồng bộ dữ liệu với Supabase Cloud...</span>
+            </div>
+          ) : sortedTasks.length === 0 ? (
+            <div style={{ padding: '60px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 40 }}>🎉</span>
+              <span style={{ color: TEXT, fontSize: 14, fontWeight: 700, marginTop: 12 }}>Tuyệt vời! Không còn deadline nào chưa hoàn thành</span>
+              <span style={{ color: MUTED, fontSize: 11, marginTop: 4 }}>Hãy tận hưởng ngày rảnh rỗi hoặc tập Cardio đốt calo nhé! 💪</span>
+            </div>
+          ) : (
+            sortedTasks.map((task, idx) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                idx={idx}
+                isDone={task.status === 'done'}
+                isStarred={!!task.starred}
+                onToggle={toggleTask}
+                onToggleStar={toggleStar}
+              />
+            ))
+          )}
         </div>
 
         {/* Sidebar */}
@@ -141,17 +376,32 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
               {/* Basic Info */}
               <div>
                 <label style={{ display: 'block', color: MUTED, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Tên công việc / Task</label>
-                <input placeholder="VD: Báo cáo Lab 4..." style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none' }} />
+                <input 
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  placeholder="VD: Báo cáo Lab 4..." 
+                  style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none' }} 
+                />
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={{ display: 'block', color: MUTED, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Môn học / Phân loại</label>
-                  <input placeholder="VD: PRJ301" style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none' }} />
+                  <input 
+                    value={newCategory}
+                    onChange={e => setNewCategory(e.target.value)}
+                    placeholder="VD: PRJ301" 
+                    style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none' }} 
+                  />
                 </div>
                 <div>
                   <label style={{ display: 'block', color: MUTED, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Hạn chót (Deadline)</label>
-                  <input type="datetime-local" style={{ width: '100%', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none', colorScheme: 'dark' }} />
+                  <input 
+                    type="datetime-local" 
+                    value={newDueDate}
+                    onChange={e => setNewDueDate(e.target.value)}
+                    style={{ width: '100%', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none', colorScheme: 'dark' }} 
+                  />
                 </div>
               </div>
 
@@ -160,14 +410,25 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: MUTED, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
                   <LinkIcon size={12} /> Link tài liệu / Bài tập
                 </label>
-                <input placeholder="https://docs.google.com/..." style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none' }} />
+                <input 
+                  value={newLink}
+                  onChange={e => setNewLink(e.target.value)}
+                  placeholder="https://docs.google.com/..." 
+                  style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none' }} 
+                />
               </div>
 
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: MUTED, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
                   <FileText size={12} /> Ghi chú thêm (Không bắt buộc)
                 </label>
-                <textarea rows={2} placeholder="Cần nộp bản cứng cho thầy vào sáng thứ 2..." style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none', resize: 'none' }} />
+                <textarea 
+                  value={newNotes}
+                  onChange={e => setNewNotes(e.target.value)}
+                  rows={2} 
+                  placeholder="Cần nộp bản cứng cho thầy vào sáng thứ 2..." 
+                  style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none', resize: 'none' }} 
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -175,13 +436,26 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
                 <div>
                   <label style={{ display: 'block', color: MUTED, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Ưu tiên quan trọng</label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {['Bình thường', 'Gắn sao 🌟'].map((lvl, i) => (
-                      <button key={lvl} style={{
-                        flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${i === 1 ? 'rgba(234,179,8,0.3)' : BORDER}`,
-                        background: i === 1 ? 'rgba(234,179,8,0.1)' : 'rgba(255,255,255,0.03)',
-                        color: i === 1 ? '#EAB308' : MUTED, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      }}>{lvl}</button>
-                    ))}
+                    <button 
+                      onClick={() => setNewIsStarred(false)}
+                      style={{
+                        flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${!newIsStarred ? 'rgba(96,165,250,0.3)' : BORDER}`,
+                        background: !newIsStarred ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.03)',
+                        color: !newIsStarred ? BLUE : MUTED, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      Bình thường
+                    </button>
+                    <button 
+                      onClick={() => setNewIsStarred(true)}
+                      style={{
+                        flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${newIsStarred ? 'rgba(234,179,8,0.3)' : BORDER}`,
+                        background: newIsStarred ? 'rgba(234,179,8,0.1)' : 'rgba(255,255,255,0.03)',
+                        color: newIsStarred ? '#EAB308' : MUTED, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      Gắn sao 🌟
+                    </button>
                   </div>
                 </div>
 
@@ -189,10 +463,16 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
                 <div>
                   <label style={{ display: 'block', color: MUTED, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Hình thức nộp</label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${BORDER}`, background: 'rgba(255,255,255,0.03)', color: TEXT, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <button 
+                      onClick={() => setNewSubmissionType('CMS')}
+                      style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${newSubmissionType === 'CMS' ? 'rgba(96,165,250,0.3)' : BORDER}`, background: newSubmissionType === 'CMS' ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.03)', color: newSubmissionType === 'CMS' ? BLUE : MUTED, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    >
                       <UploadCloud size={13} /> CMS
                     </button>
-                    <button style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${BORDER}`, background: 'transparent', color: MUTED, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <button 
+                      onClick={() => setNewSubmissionType('class')}
+                      style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${newSubmissionType === 'class' ? 'rgba(96,165,250,0.3)' : BORDER}`, background: newSubmissionType === 'class' ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.03)', color: newSubmissionType === 'class' ? BLUE : MUTED, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    >
                       <Users size={13} /> Tại lớp
                     </button>
                   </div>
@@ -200,14 +480,15 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
               </div>
 
               <button 
-                onClick={() => setShowAddModal(false)}
+                onClick={handleAddTask}
+                disabled={isSaving}
                 style={{
                   width: '100%', padding: '12px 0', borderRadius: 8, marginTop: 10,
-                  background: BLUE, border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                  boxShadow: '0 0 16px rgba(96,165,250,0.4)',
+                  background: BLUE, border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 0 16px rgba(96,165,250,0.4)', opacity: isSaving ? 0.7 : 1
                 }}
               >
-                Tạo Deadline
+                {isSaving ? 'Đang tạo...' : 'Tạo Deadline'}
               </button>
             </div>
           </div>

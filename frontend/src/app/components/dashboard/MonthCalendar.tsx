@@ -27,16 +27,49 @@ export function MonthCalendar({ year, month, dbSchedules = [] }: Props) {
 
   const getEventsForCell = (cell: { active: boolean; fullDate: Date }): CEvent[] => {
     if (!cell.active) return [];
-    const fixed = getEventsForDay(cell.fullDate);
-    const db    = dbSchedules
-      .filter(item => {
-        const t = new Date(item.start_time);
-        return t.getFullYear() === cell.fullDate.getFullYear() &&
-               t.getMonth()    === cell.fullDate.getMonth()    &&
-               t.getDate()     === cell.fullDate.getDate();
-      })
-      .map(item => ({ title: item.title, type: (item.type === 'fitness' ? 'workout' : 'fixed') as CEvent['type'] }));
-    return [...fixed, ...db];
+    const day = cell.fullDate.getDay(); // 0: CN, 1: T2, etc.
+    const date = cell.fullDate;
+    
+    // Lọc các lịch trùng ngày trong tuần từ database (lịch lặp lại hàng tuần hoặc theo ngày cụ thể)
+    const dbToday = dbSchedules.filter(item => {
+      // Nếu có specific_date, chỉ hiển thị đúng ngày đó
+      if (item.specific_date) {
+        const sDate = new Date(item.specific_date);
+        return sDate.getFullYear() === date.getFullYear() && 
+               sDate.getMonth() === date.getMonth() && 
+               sDate.getDate() === date.getDate();
+      }
+
+      // Nếu không có specific_date, kiểm tra lặp theo mảng days
+      if (Array.isArray(item.days)) {
+        const isDayMatch = item.days.includes(day);
+        if (!isDayMatch) return false;
+
+        // Logic lọc nâng cao cho lịch học FPTU học kì Summer 2026
+        if (item.type === 'class' || item.title.includes('học') || item.title.includes('FPTU')) {
+          // 1. Chỉ áp dụng đến hết tháng 7/2026 (sau 31/07/2026 sẽ tự động ẩn)
+          const limitDate = new Date(2026, 6, 31, 23, 59, 59); // Lưu ý: Tháng 7 trong JS là index 6
+          if (date > limitDate) return false;
+        }
+
+        // 2. Nghỉ ngơi cả tuần từ 6/7/2026 đến 12/7/2026 (không render bất kỳ lịch lặp lại nào)
+        const startBreak = new Date(2026, 6, 6, 0, 0, 0); // 6 tháng 7
+        const endBreak = new Date(2026, 6, 12, 23, 59, 59); // 12 tháng 7
+        if (date >= startBreak && date <= endBreak) return false;
+
+        return true;
+      }
+      return false;
+    });
+
+    const mapped = dbToday.map(item => ({
+      title: item.title,
+      type: (item.type === 'workout' ? 'workout' : 'fixed') as CEvent['type'],
+      sh: 0,
+      eh: 0
+    }));
+
+    return mapped;
   };
 
   return (

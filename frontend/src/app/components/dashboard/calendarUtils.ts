@@ -10,9 +10,9 @@ export const TEXT   = '#FFFFFF';
 export const GREEN  = '#22C55E';
 
 // ─── Calendar Constants ───────────────────────────────────────────────────────
-export const START_H  = 7;  // 7AM start
+export const START_H  = 6;  // 6AM start (để hiển thị event sáng sớm)
 export const PX_PER_H = 38; // pixels per hour
-export const HOURS    = Array.from({ length: 14 }, (_, i) => i + START_H); // 7AM–9PM
+export const HOURS    = Array.from({ length: 16 }, (_, i) => i + START_H); // 6AM–10PM
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CEvent {
@@ -43,11 +43,6 @@ export interface AiLog {
 export function getEventsForDay(date: Date): CEvent[] {
   const day  = date.getDay();
   const events: CEvent[] = [];
-
-  // Special event: Đạt birthday 06/06/2026
-  if (date.getFullYear() === 2026 && date.getMonth() === 5 && date.getDate() === 6) {
-    return [{ title: 'Đi sinh nhật Đạt 🎂', sub: '6:00–9:30 CH', type: 'fixed', sh: 18, eh: 21.5, col: 0, cols: 1 }];
-  }
 
   // Mon (1), Wed (3), Fri (5) — FPTU + Work overlap
   if (day === 1 || day === 3 || day === 5) {
