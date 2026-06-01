@@ -40,7 +40,8 @@ function mapDbDeadlineToTask(db: any): Task {
     daysLeft: isNaN(diffDays) ? 0 : diffDays,
     status: db.is_done ? 'done' : 'pending',
     starred: !!db.is_starred,
-    notes: '',
+    notes: db.notes || '',
+    link: db.link || '',
     originalDb: db,
   };
 }
@@ -86,8 +87,8 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
       setTasks(allTasks);
 
     } catch (err) {
-      console.error('Lỗi nạp dữ liệu:', err);
-      toast.error('Không thể tải danh sách công việc! 💅');
+      console.error('Lỗi nạp dữ liệu tasks:', err);
+      toast.error('Không thể tải danh sách công việc! (xem console) 💅');
     } finally {
       setIsLoading(false);
     }
@@ -179,9 +180,13 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
         title: newTitle.trim(),
         category: newCategory.trim() || 'Chung',
         deadline: new Date(newDueDate).toISOString(),
+        notes: newNotes.trim(),
         is_done: false,
         is_starred: newIsStarred,
+        link: newLink.trim(),
+        submission_type: newSubmissionType,
       };
+
 
       let err;
       if (editingTaskId) {
@@ -191,6 +196,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
         const { error } = await supabase.from('tasks').insert({ ...payload, profile_id: QUAN_UUID });
         err = error;
       }
+
 
       if (err) throw err;
       toast.success(editingTaskId ? 'Cập nhật deadline thành công! 💅' : 'Đã lên lịch deadline mới thành công! 🚀');
@@ -219,9 +225,21 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
     const db = task.originalDb;
     setNewTitle(db.title || '');
     setNewCategory(db.category || '');
-    // format to datetime-local 'YYYY-MM-DDTHH:mm'
-    const due = db.deadline ? new Date(db.deadline).toISOString().slice(0,16) : '';
+    // format to datetime-local 'YYYY-MM-DDTHH:mm' in local timezone
+    let due = '';
+    if (db.deadline) {
+      const d = new Date(db.deadline);
+      const tzOffset = d.getTimezoneOffset() * 60000;
+      due = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+    }
     setNewDueDate(due);
+    setNewNotes(db.notes || '');
+    setNewLink(db.link || '');
+    if (db.submission_type === 'CMS' || db.submission_type === 'class') {
+      setNewSubmissionType(db.submission_type);
+    } else {
+      setNewSubmissionType('CMS');
+    }
     setNewIsStarred(!!db.is_starred);
     setEditingTaskId(task.id);
     setShowAddModal(true);
@@ -231,6 +249,9 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
     setNewTitle('');
     setNewCategory('');
     setNewDueDate('');
+    setNewNotes('');
+    setNewLink('');
+    setNewSubmissionType('CMS');
     setNewIsStarred(false);
     setEditingTaskId(null);
     setShowAddModal(true);
@@ -402,11 +423,11 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
 
           {/* Table headers */}
           <div className="tasks-table-min-width tasks-table-header" style={{
-            display: 'grid', gridTemplateColumns: '32px 1fr 130px 110px 120px 80px',
+            display: 'grid', gridTemplateColumns: '32px 1fr 180px 130px 110px 120px 80px',
             gap: 12, padding: '6px 16px', marginBottom: 6,
             color: MUTED, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
           }}>
-            <div /> <div>Công việc</div> <div>Môn học</div> <div>Hạn chót</div> <div>Trạng thái</div> <div style={{ textAlign: 'center' }}>Hành động</div>
+            <div /> <div>Công việc</div> <div>note</div> <div>Môn học</div> <div>Hạn chót</div> <div>Trạng thái</div> <div style={{ textAlign: 'center' }}>Hành động</div>
           </div>
 
           {/* Dynamic Content Loader */}
@@ -520,7 +541,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
                   value={newNotes}
                   onChange={e => setNewNotes(e.target.value)}
                   rows={2} 
-                  placeholder="Cần nộp bản cứng cho thầy vào sáng thứ 2..." 
+                  placeholder="VD: Cần nộp bản cứng cho thầy vào sáng thứ 2..." 
                   style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: TEXT, fontSize: 13, outline: 'none', resize: 'none' }} 
                 />
               </div>

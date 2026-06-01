@@ -2,6 +2,7 @@
 
 import { Check, Star, Trash2, Edit2 } from 'lucide-react';
 import { Task, ORANGE, MUTED, BLUE, GREEN, BORDER, TEXT } from './tasksUtils';
+import { useState, useEffect } from 'react';
 
 interface Props {
   task: Task;
@@ -14,13 +15,81 @@ interface Props {
   onEdit?: (task: Task) => void;
 }
 
+function TaskNotePopup({ note, onClose }: { note: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          width: 520,
+          maxWidth: '92vw',
+          background: 'rgba(18,18,18,0.95)',
+          border: `1px solid ${BORDER}`,
+          borderRadius: 14,
+          padding: 14,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ color: TEXT, fontSize: 14, fontWeight: 800, marginBottom: 12 }}>Ghi chú công việc</div>
+        <div style={{ color: MUTED, fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6, maxHeight: '60vh', overflowY: 'auto' }}>
+          {note}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${BORDER}`,
+              color: TEXT,
+              padding: '8px 16px',
+              borderRadius: 10,
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: 12,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar, onDelete, onEdit }: Props) {
+  const [showNotePopup, setShowNotePopup] = useState(false);
+  
   // Khẩn cấp nếu chưa xong và thời gian còn <= 1 ngày
   const isUrgent = !isDone && task.daysLeft <= 1;
   
   return (
     <div className="tasks-table-min-width task-row" style={{
-      display: 'grid', gridTemplateColumns: '32px 1fr 130px 110px 120px 80px',
+      display: 'grid', gridTemplateColumns: '32px 1fr 180px 130px 110px 120px 80px',
       gap: 12, padding: '16px', marginBottom: 8,
       background: 'rgba(18,18,18,0.4)', borderRadius: 12,
       border: `1px solid ${isUrgent ? 'rgba(255,92,0,0.3)' : BORDER}`,
@@ -50,10 +119,39 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar, 
         <div style={{ color: MUTED, fontSize: 11, marginTop: 4 }}>{task.code} {task.link && `· Cầm link`}</div>
       </div>
       
-      {/* 3. Môn học */}
+      {/* 3. Note */}
+      <div style={{ minWidth: 0 }}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (task.notes) setShowNotePopup(true);
+          }}
+          style={{
+            width: '100%',
+            maxWidth: 180,
+            padding: '0px 0',
+            background: 'transparent',
+            border: 'none',
+            color: MUTED,
+            fontSize: 11.5,
+            fontWeight: 600,
+            cursor: task.notes ? 'pointer' : 'default',
+            textAlign: 'left',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+          title={task.notes || ''}
+        >
+          {task.notes ? task.notes : '—'}
+        </button>
+      </div>
+      
+      {/* 4. Môn học */}
       <div style={{ color: MUTED, fontSize: 12, fontWeight: 500 }}>{task.course}</div>
       
-      {/* 4. Hạn chót */}
+      {/* 5. Hạn chót */}
       <div>
         <div style={{ color: isDone ? MUTED : TEXT, fontSize: 12, fontWeight: 700 }}>{task.due}</div>
         <div style={{ color: isUrgent ? ORANGE : MUTED, fontSize: 10, marginTop: 2 }}>
@@ -73,8 +171,14 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar, 
         </span>
       </div>
 
+      {/* Popup note */}
+      {showNotePopup && task.notes && (
+        <TaskNotePopup note={task.notes} onClose={() => setShowNotePopup(false)} />
+      )}
+
       {/* 6. Hành động */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+
           <button 
             onClick={() => onEdit?.(task)}
             style={{ 
