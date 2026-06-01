@@ -78,6 +78,54 @@ export async function POST(request: Request) {
     const body = await request.json();
     console.log('--- RECEIVED TELEGRAM WEBHOOK ---', JSON.stringify(body));
 
+    // 0. Xử lý Nút Bấm (Callback Query) từ hệ thống nhắc nhở
+    if (body.callback_query) {
+      const callbackQuery = body.callback_query;
+      const data = callbackQuery.data; // e.g. "done_TASK-ID" or "doing_TASK-ID"
+      const messageId = callbackQuery.message.message_id;
+      const chatId = callbackQuery.message.chat.id;
+      const callbackQueryId = callbackQuery.id;
+
+      if (data.startsWith('done_') || data.startsWith('doing_')) {
+        const action = data.split('_')[0]; // "done" or "doing"
+        const taskId = data.split('_')[1];
+
+        if (action === 'done') {
+          await supabase.from('tasks').update({ is_done: true }).eq('id', taskId);
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              message_id: messageId,
+              text: '✅ <b>Tốt lắm cưng!</b> Đã xác nhận hoàn thành. Cho nghỉ ngơi đấy! 💅',
+              parse_mode: 'HTML',
+            }),
+          });
+        } else if (action === 'doing') {
+          const extraTime = new Date(Date.now() + 25 * 60 * 1000); 
+          await supabase.from('tasks').update({ last_notified_at: extraTime.toISOString() }).eq('id', taskId);
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              message_id: messageId,
+              text: '🏃‍♂️ <b>Đang chạy rồi à?</b> Tạm tha 30 phút nữa chị quay lại check! 💅',
+              parse_mode: 'HTML',
+            }),
+          });
+        }
+
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callback_query_id: callbackQueryId, text: 'Đã cập nhật!' }),
+        });
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     if (!body.message || !body.message.text) {
       return NextResponse.json({ ok: true });
     }
