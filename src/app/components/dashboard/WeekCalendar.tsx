@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   BG, CARD, ORANGE, MUTED, BORDER, TEXT,
-  START_H, PX_PER_H, HOURS,
+  PX_PER_H,
   CEvent, getEventsForDay, parseTimeToHours, formatTime,
 } from './calendarUtils';
 import { Plus } from 'lucide-react';
@@ -18,6 +18,7 @@ interface WeekDay {
 interface Props {
   weekDays: WeekDay[];
   dbSchedules: any[];
+  onEventClick?: (ev: CEvent) => void;
 }
 
 function parseTimeToDecimal(timeStr: string): number {
@@ -29,9 +30,14 @@ function parseTimeToDecimal(timeStr: string): number {
 
 function getCombinedEvents(date: Date, dbSchedules: any[]): CEvent[] {
   const day = date.getDay(); // 0: CN, 1: T2, etc.
+  const dateStr = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
   // Lọc lịch cố định của ngày hôm nay từ dbSchedules (lịch lặp lại hàng tuần hoặc theo ngày cụ thể)
   const dbToday = dbSchedules.filter(item => {
+    // Nếu ngày nằm trong excluded_dates thì bỏ qua
+    if (item.excluded_dates && Array.isArray(item.excluded_dates) && item.excluded_dates.includes(dateStr)) {
+      return false;
+    }
     // Nếu có specific_date, chỉ hiển thị đúng ngày đó
     if (item.specific_date) {
       const sDate = new Date(item.specific_date);
@@ -82,6 +88,10 @@ function getCombinedEvents(date: Date, dbSchedules: any[]): CEvent[] {
     const sub = `${formatTimePart(startH, startM)}–${formatTimePart(endH, endM)}`;
 
     return {
+      id: item.id,
+      notes: item.notes,
+      originalSchedule: item,
+      date_rendered: dateStr,
       title: item.title,
       sub,
       type: item.type === 'workout' ? 'workout' : 'fixed',
@@ -92,29 +102,83 @@ function getCombinedEvents(date: Date, dbSchedules: any[]): CEvent[] {
     };
   });
 
-  // Xử lý trùng lặp cột thông minh (overlapping columns)
-  for (let i = 0; i < mapped.length; i++) {
-    for (let j = i + 1; j < mapped.length; j++) {
-      const a = mapped[i];
-      const b = mapped[j];
-      const overlap = (a.sh < b.eh && a.eh > b.sh);
-      if (overlap) {
-        a.cols = 2;
-        b.cols = 2;
-        b.col = 1;
+  // Xử lý trùng lặp cột thông minh (overlapping columns) - Thuật toán chia cluster
+  mapped.sort((a, b) => {
+    if (a.sh !== b.sh) return a.sh - b.sh;
+    return b.eh - a.eh;
+  });
+
+  const clusters: typeof mapped[] = [];
+  let currentCluster: typeof mapped = [];
+  let clusterEnd = 0;
+
+  for (const ev of mapped) {
+    if (currentCluster.length === 0) {
+      currentCluster.push(ev);
+      clusterEnd = ev.eh;
+    } else if (ev.sh < clusterEnd) {
+      currentCluster.push(ev);
+      if (ev.eh > clusterEnd) clusterEnd = ev.eh;
+    } else {
+      clusters.push(currentCluster);
+      currentCluster = [ev];
+      clusterEnd = ev.eh;
+    }
+  }
+  if (currentCluster.length > 0) clusters.push(currentCluster);
+
+  for (const cluster of clusters) {
+    const columns: typeof mapped[] = [];
+    
+    for (const ev of cluster) {
+      let placed = false;
+      for (let i = 0; i < columns.length; i++) {
+        const colArr = columns[i];
+        const lastEv = colArr[colArr.length - 1];
+        if (lastEv.eh <= ev.sh) {
+          colArr.push(ev);
+          ev.col = i;
+          placed = true;
+          break;
+        }
       }
+      if (!placed) {
+        ev.col = columns.length;
+        columns.push([ev]);
+      }
+    }
+    
+    const numCols = columns.length;
+    for (const ev of cluster) {
+      ev.cols = numCols;
     }
   }
 
   return mapped;
 }
 
-export function WeekCalendar({ weekDays, dbSchedules }: Props) {
+export function WeekCalendar({ weekDays, dbSchedules, onEventClick }: Props) {
+  // Tính toán dynamic hours
+  let minH = 7;
+  let maxH = 19;
+  
+  weekDays.forEach(day => {
+    const events = getCombinedEvents(day.fullDate, dbSchedules);
+    events.forEach(ev => {
+      if (ev.sh < minH) minH = Math.floor(ev.sh);
+      if (ev.eh > maxH) maxH = Math.ceil(ev.eh);
+    });
+  });
+  
+  const START_H = Math.max(0, minH - 1);
+  const END_H = Math.min(24, maxH + 1);
+  const HOURS = Array.from({ length: END_H - START_H }, (_, i) => i + START_H);
+
   const calH = HOURS.length * PX_PER_H;
   const [showAddModal, setShowAddModal] = useState(false);
 
   return (
-    <div style={{ position: 'relative', flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+    <div style={{ position: 'relative', flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
       <style dangerouslySetInnerHTML={{ __html: `
         .week-cal-inner {
           min-width: 600px; /* Force minimum width to prevent squishing on mobile */
@@ -234,6 +298,9 @@ export function WeekCalendar({ weekDays, dbSchedules }: Props) {
                       e.currentTarget.style.transform = 'scale(1)';
                       e.currentTarget.style.zIndex = '1';
                       e.currentTarget.style.boxShadow = 'none';
+                    }}
+                    onClick={() => {
+                      if (onEventClick) onEventClick(ev);
                     }}
                   >
                     <div style={{

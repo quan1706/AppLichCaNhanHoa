@@ -10,12 +10,17 @@ export const TEXT   = '#FFFFFF';
 export const GREEN  = '#22C55E';
 
 // ─── Calendar Constants ───────────────────────────────────────────────────────
-export const START_H  = 6;  // 6AM start (để hiển thị event sáng sớm)
 export const PX_PER_H = 38; // pixels per hour
-export const HOURS    = Array.from({ length: 16 }, (_, i) => i + START_H); // 6AM–10PM
+// Thay vì fix cứng START_H và HOURS, chúng ta sẽ tính toán động trong component
+// export const START_H  = 6;  
+// export const HOURS    = Array.from({ length: 16 }, (_, i) => i + START_H); 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CEvent {
+  id?: any;
+  notes?: string;
+  originalSchedule?: any;
+  date_rendered?: string;
   title: string;
   sub?: string;
   type: 'fixed' | 'workout';

@@ -38,6 +38,11 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
   const [showAiChatModal, setShowAiChatModal] = useState(false);
   const [targetWeight, setTargetWeight] = useState<number | string>('78');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Event Details Modal States
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [editNotesContent, setEditNotesContent] = useState('');
+  const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
 
   // Add Schedule Form States
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
@@ -75,6 +80,84 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
       setIsSavingSchedule(false);
     }
   };
+
+  const handleEventClick = (ev: any) => {
+    setSelectedEvent(ev);
+    setEditNotesContent(ev.notes || '');
+  };
+
+  const handleUpdateNote = async () => {
+    if (!selectedEvent || !selectedEvent.originalSchedule) return;
+    setIsUpdatingSchedule(true);
+    try {
+      const orig = selectedEvent.originalSchedule;
+      // Nếu là lịch lặp lại (có days) và đang sửa cho 1 ngày cụ thể
+      if (Array.isArray(orig.days) && orig.days.length > 0 && selectedEvent.date_rendered) {
+        // Tạo lịch mới cho ngày này
+        const newSched = { ...orig };
+        delete newSched.id;
+        newSched.days = null;
+        newSched.specific_date = selectedEvent.date_rendered;
+        newSched.notes = editNotesContent;
+        
+        // Thêm ngày này vào excluded_dates của lịch cũ
+        const currentExcluded = Array.isArray(orig.excluded_dates) ? orig.excluded_dates : [];
+        if (!currentExcluded.includes(selectedEvent.date_rendered)) {
+          currentExcluded.push(selectedEvent.date_rendered);
+        }
+
+        const { error: err1 } = await supabase.from('schedules').update({ excluded_dates: currentExcluded }).eq('id', orig.id);
+        if (err1) throw err1;
+        
+        const { error: err2 } = await supabase.from('schedules').insert([newSched]);
+        if (err2) throw err2;
+        
+      } else {
+        // Sửa lịch trực tiếp
+        const { error } = await supabase.from('schedules').update({ notes: editNotesContent }).eq('id', orig.id);
+        if (error) throw error;
+      }
+      toast.success('Cập nhật ghi chú thành công! 💅');
+      setSelectedEvent(null);
+      fetchSchedules();
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi cập nhật ghi chú!');
+    } finally {
+      setIsUpdatingSchedule(false);
+    }
+  };
+
+  const handleDeleteSchedule = async () => {
+    if (!selectedEvent || !selectedEvent.originalSchedule) return;
+    if (!confirm('Chắc chắn xóa lịch này?')) return;
+    setIsUpdatingSchedule(true);
+    try {
+      const orig = selectedEvent.originalSchedule;
+      // Nếu là lịch lặp lại (có days) và đang xóa cho 1 ngày cụ thể
+      if (Array.isArray(orig.days) && orig.days.length > 0 && selectedEvent.date_rendered) {
+        const currentExcluded = Array.isArray(orig.excluded_dates) ? orig.excluded_dates : [];
+        if (!currentExcluded.includes(selectedEvent.date_rendered)) {
+          currentExcluded.push(selectedEvent.date_rendered);
+        }
+        const { error } = await supabase.from('schedules').update({ excluded_dates: currentExcluded }).eq('id', orig.id);
+        if (error) throw error;
+      } else {
+        // Xóa hoàn toàn lịch
+        const { error } = await supabase.from('schedules').delete().eq('id', orig.id);
+        if (error) throw error;
+      }
+      toast.success('Đã xóa lịch! 💅');
+      setSelectedEvent(null);
+      fetchSchedules();
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi xóa lịch!');
+    } finally {
+      setIsUpdatingSchedule(false);
+    }
+  };
+
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 
   // Fetch Data
@@ -338,8 +421,8 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
             onNextTime={() => shiftTime(1)}
             onGoToday={goToday}
           />
-          {viewMode === 'week'  && <WeekCalendar weekDays={weekDays} dbSchedules={dbSchedules} />}
-          {viewMode === 'month' && <MonthCalendar year={currentDate.getFullYear()} month={currentDate.getMonth()} dbSchedules={dbSchedules} />}
+          {viewMode === 'week'  && <WeekCalendar weekDays={weekDays} dbSchedules={dbSchedules} onEventClick={handleEventClick} />}
+          {viewMode === 'month' && <MonthCalendar year={currentDate.getFullYear()} month={currentDate.getMonth()} dbSchedules={dbSchedules} onEventClick={handleEventClick} />}
           {viewMode === 'year'  && <YearCalendar year={currentDate.getFullYear()} />}
         </div>
 
@@ -528,6 +611,68 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
               >
                 {isSavingSchedule ? 'Đang tạo...' : 'Tạo Lịch'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Details Modal */}
+      {selectedEvent && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          <div style={{
+            width: 480, background: 'rgba(18,18,18,0.95)', border: `1px solid ${BORDER}`,
+            borderRadius: 16, padding: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: selectedEvent.type === 'fixed' ? '#F87171' : '#FFA066', boxShadow: '0 0 8px rgba(255,92,0,0.8)' }} />
+                  {selectedEvent.title}
+                </div>
+                {selectedEvent.sub && <div style={{ color: '#7A7A7A', fontSize: 13, marginTop: 4 }}>{selectedEvent.sub}</div>}
+              </div>
+              <button onClick={() => setSelectedEvent(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#7A7A7A' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Ghi chú công việc / Lịch trình</label>
+                <textarea 
+                  value={editNotesContent} onChange={e => setEditNotesContent(e.target.value)}
+                  placeholder="Nhập ghi chú tại đây..." 
+                  rows={4}
+                  style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none', resize: 'vertical' }} 
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
+                <button 
+                  onClick={handleDeleteSchedule} disabled={isUpdatingSchedule}
+                  style={{
+                    padding: '10px 0', borderRadius: 8,
+                    background: 'rgba(229,62,62,0.15)', border: '1px solid rgba(229,62,62,0.4)', color: '#F87171', fontSize: 13, fontWeight: 700, cursor: isUpdatingSchedule ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Xóa Lịch
+                </button>
+                <button 
+                  onClick={handleUpdateNote} disabled={isUpdatingSchedule}
+                  style={{
+                    padding: '10px 0', borderRadius: 8,
+                    background: '#FF5C00', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: isUpdatingSchedule ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 0 16px rgba(255,92,0,0.4)'
+                  }}
+                >
+                  {isUpdatingSchedule ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -6,9 +6,10 @@ interface Props {
   year: number;
   month: number;
   dbSchedules?: any[];
+  onEventClick?: (ev: CEvent) => void;
 }
 
-export function MonthCalendar({ year, month, dbSchedules = [] }: Props) {
+export function MonthCalendar({ year, month, dbSchedules = [], onEventClick }: Props) {
   const firstDay      = new Date(year, month, 1);
   const dayOfWeek     = firstDay.getDay();
   const prefixDays    = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -29,9 +30,15 @@ export function MonthCalendar({ year, month, dbSchedules = [] }: Props) {
     if (!cell.active) return [];
     const day = cell.fullDate.getDay(); // 0: CN, 1: T2, etc.
     const date = cell.fullDate;
-    
+    const dateStr = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
     // Lọc các lịch trùng ngày trong tuần từ database (lịch lặp lại hàng tuần hoặc theo ngày cụ thể)
     const dbToday = dbSchedules.filter(item => {
+      // Nếu ngày nằm trong excluded_dates thì bỏ qua
+      if (item.excluded_dates && Array.isArray(item.excluded_dates) && item.excluded_dates.includes(dateStr)) {
+        return false;
+      }
+
       // Nếu có specific_date, chỉ hiển thị đúng ngày đó
       if (item.specific_date) {
         const sDate = new Date(item.specific_date);
@@ -63,6 +70,10 @@ export function MonthCalendar({ year, month, dbSchedules = [] }: Props) {
     });
 
     const mapped = dbToday.map(item => ({
+      id: item.id,
+      notes: item.notes,
+      originalSchedule: item,
+      date_rendered: dateStr,
       title: item.title,
       type: (item.type === 'workout' ? 'workout' : 'fixed') as CEvent['type'],
       sh: 0,
@@ -73,7 +84,7 @@ export function MonthCalendar({ year, month, dbSchedules = [] }: Props) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingRight: 20, overflowX: 'auto', overflowY: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingRight: 20, overflowX: 'auto', overflowY: 'auto' }}>
       <style dangerouslySetInnerHTML={{ __html: `
         .month-cal-inner {
           min-width: 600px;
@@ -122,7 +133,9 @@ export function MonthCalendar({ year, month, dbSchedules = [] }: Props) {
                   {/* Event chips */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, overflowY: 'hidden' }}>
                     {evs.map((ev, ei) => (
-                      <div key={ei} style={{
+                      <div key={ei} 
+                        onClick={(e) => { e.stopPropagation(); if (onEventClick) onEventClick(ev); }}
+                        style={{
                         fontSize: 9.5, fontWeight: 600, padding: '3px 6px', borderRadius: 4,
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         backgroundColor: ev.type === 'fixed' ? 'rgba(229,62,62,0.15)' : 'rgba(255,92,0,0.15)',
