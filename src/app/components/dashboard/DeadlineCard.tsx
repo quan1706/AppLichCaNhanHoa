@@ -56,7 +56,7 @@ export function DeadlineCard({ items }: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
               <Clock size={11} color={item.urgent ? ORANGE : MUTED} />
               <span style={{ color: item.urgent ? ORANGE : MUTED, fontSize: 10.5, fontWeight: 700 }}>
-                {item.days < 0 ? 'Quá hạn' : `Còn ${item.days} ngày`}
+                {item.days < 0 ? `Quá hạn ${Math.abs(item.days)} ngày` : item.days === 0 ? 'Hôm nay' : `Còn ${item.days} ngày`}
               </span>
             </div>
           </div>

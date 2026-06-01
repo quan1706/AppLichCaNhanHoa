@@ -54,7 +54,9 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar }
       {/* 4. Hạn chót */}
       <div>
         <div style={{ color: isDone ? MUTED : TEXT, fontSize: 12, fontWeight: 700 }}>{task.due}</div>
-        <div style={{ color: isUrgent ? ORANGE : MUTED, fontSize: 10, marginTop: 2 }}>Còn {task.daysLeft} ngày</div>
+        <div style={{ color: isUrgent ? ORANGE : MUTED, fontSize: 10, marginTop: 2 }}>
+          {task.daysLeft < 0 ? `Quá hạn ${Math.abs(task.daysLeft)} ngày` : task.daysLeft === 0 ? 'Hôm nay' : `Còn ${task.daysLeft} ngày`}
+        </div>
       </div>
       
       {/* 5. Trạng thái */}
@@ -65,7 +67,7 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar }
           color: isDone ? GREEN : isUrgent ? ORANGE : MUTED,
           border: `1px solid ${isDone ? 'rgba(34,197,94,0.2)' : isUrgent ? 'rgba(255,92,0,0.2)' : BORDER}`,
         }}>
-          {isDone ? 'ĐÃ XONG' : isUrgent ? 'KHẨN CẤP 🔥' : 'CHƯA LÀM'}
+          {isDone ? 'ĐÃ XONG' : (!isDone && task.daysLeft < 0) ? 'QUÁ HẠN 🚨' : isUrgent ? 'KHẨN CẤP 🔥' : 'CHƯA LÀM'}
         </span>
       </div>
 
