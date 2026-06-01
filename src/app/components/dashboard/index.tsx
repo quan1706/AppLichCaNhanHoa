@@ -39,10 +39,20 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
   const [targetWeight, setTargetWeight] = useState<number | string>('78');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Event Details Modal States
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [editNotesContent, setEditNotesContent] = useState('');
+  const [editScheduleTitle, setEditScheduleTitle] = useState('');
+  const [editScheduleType, setEditScheduleType] = useState('class');
+  const [editScheduleStartTime, setEditScheduleStartTime] = useState('');
+  const [editScheduleEndTime, setEditScheduleEndTime] = useState('');
   const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
+
+  // Edit Deadline States
+  const [selectedDeadline, setSelectedDeadline] = useState<any>(null);
+  const [editDeadlineTitle, setEditDeadlineTitle] = useState('');
+  const [editDeadlineDate, setEditDeadlineDate] = useState('');
+  const [editDeadlineStatus, setEditDeadlineStatus] = useState('');
+  const [isUpdatingDeadline, setIsUpdatingDeadline] = useState(false);
 
   // Add Schedule Form States
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
@@ -84,6 +94,11 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
   const handleEventClick = (ev: any) => {
     setSelectedEvent(ev);
     setEditNotesContent(ev.notes || '');
+    setEditScheduleTitle(ev.title || '');
+    setEditScheduleType(ev.type || 'class');
+    const os = ev.originalSchedule;
+    setEditScheduleStartTime(os?.start_time ? os.start_time.substring(0,5) : '');
+    setEditScheduleEndTime(os?.end_time ? os.end_time.substring(0,5) : '');
   };
 
   const handleUpdateNote = async () => {
@@ -91,14 +106,21 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
     setIsUpdatingSchedule(true);
     try {
       const orig = selectedEvent.originalSchedule;
+      const payload = {
+         notes: editNotesContent,
+         title: editScheduleTitle,
+         type: editScheduleType,
+         start_time: editScheduleStartTime + ':00',
+         end_time: editScheduleEndTime + ':00'
+      };
+
       // Nếu là lịch lặp lại (có days) và đang sửa cho 1 ngày cụ thể
       if (Array.isArray(orig.days) && orig.days.length > 0 && selectedEvent.date_rendered) {
         // Tạo lịch mới cho ngày này
-        const newSched = { ...orig };
+        const newSched = { ...orig, ...payload };
         delete newSched.id;
         newSched.days = null;
         newSched.specific_date = selectedEvent.date_rendered;
-        newSched.notes = editNotesContent;
         
         // Thêm ngày này vào excluded_dates của lịch cũ
         const currentExcluded = Array.isArray(orig.excluded_dates) ? orig.excluded_dates : [];
@@ -114,10 +136,10 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
         
       } else {
         // Sửa lịch trực tiếp
-        const { error } = await supabase.from('schedules').update({ notes: editNotesContent }).eq('id', orig.id);
+        const { error } = await supabase.from('schedules').update(payload).eq('id', orig.id);
         if (error) throw error;
       }
-      toast.success('Cập nhật ghi chú thành công! 💅');
+      toast.success('Cập nhật lịch thành công! 💅');
       setSelectedEvent(null);
       fetchSchedules();
     } catch (err) {
@@ -155,6 +177,53 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
       toast.error('Lỗi khi xóa lịch!');
     } finally {
       setIsUpdatingSchedule(false);
+    }
+  };
+
+  const handleEditDeadlineClick = (dl: any) => {
+    setSelectedDeadline(dl);
+    setEditDeadlineTitle(dl.title);
+    setEditDeadlineDate(dl.due_date ? dl.due_date.substring(0, 10) : '');
+    setEditDeadlineStatus(dl.status);
+  };
+
+  const handleUpdateDeadline = async () => {
+    if (!selectedDeadline) return;
+    setIsUpdatingDeadline(true);
+    try {
+      const { error } = await supabase.from('deadlines').update({ 
+        title: editDeadlineTitle,
+        due_date: editDeadlineDate ? new Date(editDeadlineDate).toISOString() : new Date().toISOString(),
+        status: editDeadlineStatus
+      }).eq('id', selectedDeadline.id);
+      
+      if (error) throw error;
+      toast.success('Cập nhật deadline thành công! 💅');
+      setSelectedDeadline(null);
+      fetchDeadlines();
+    } catch(err) {
+      console.error(err);
+      toast.error('Lỗi cập nhật deadline!');
+    } finally {
+      setIsUpdatingDeadline(false);
+    }
+  };
+
+  const handleDeleteDeadline = async () => {
+    if (!selectedDeadline) return;
+    if (!confirm('Chắc chắn xóa deadline này?')) return;
+    setIsUpdatingDeadline(true);
+    try {
+      const { error } = await supabase.from('deadlines').delete().eq('id', selectedDeadline.id);
+      if (error) throw error;
+      toast.success('Đã xóa deadline! 💅');
+      setSelectedDeadline(null);
+      fetchDeadlines();
+    } catch(err) {
+      console.error(err);
+      toast.error('Lỗi khi xóa deadline!');
+    } finally {
+      setIsUpdatingDeadline(false);
     }
   };
 
@@ -432,7 +501,7 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
           flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12, height: '100%', overflowY: 'auto', overflowX: 'hidden'
         }}>
           <HealthCard water={waterIntake} onAddWater={handleAddWater} />
-          <DeadlineCard items={dbDeadlines} />
+          <DeadlineCard items={dbDeadlines} onEdit={handleEditDeadlineClick} />
           <MotivationCard quote={tamquanQuote} />
           <AiActivityLog logs={aiLogs} />
         </div>
@@ -533,7 +602,9 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
 
       {/* Add Schedule Modal */}
       {showAddScheduleModal && (
-        <div style={{
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddScheduleModal(false) }}
+          style={{
           position: 'absolute', inset: 0, zIndex: 9999,
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -618,7 +689,9 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
 
       {/* Schedule Details Modal */}
       {selectedEvent && (
-        <div style={{
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedEvent(null) }}
+          style={{
           position: 'absolute', inset: 0, zIndex: 9999,
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -642,6 +715,45 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Tên lịch trình</label>
+                <input 
+                  value={editScheduleTitle} onChange={e => setEditScheduleTitle(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none' }} 
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Phân loại</label>
+                  <select 
+                    value={editScheduleType} onChange={e => setEditScheduleType(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', background: 'rgba(10,10,10,1)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none' }}>
+                    <option value="class">Học tập / Lớp học</option>
+                    <option value="work">Công việc</option>
+                    <option value="workout">Tập luyện</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Giờ bắt đầu</label>
+                  <input 
+                    type="time" value={editScheduleStartTime} onChange={e => setEditScheduleStartTime(e.target.value)}
+                    style={{ width: '100%', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none', colorScheme: 'dark' }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Giờ kết thúc</label>
+                  <input 
+                    type="time" value={editScheduleEndTime} onChange={e => setEditScheduleEndTime(e.target.value)}
+                    style={{ width: '100%', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none', colorScheme: 'dark' }} 
+                  />
+                </div>
+              </div>
+
               <div>
                 <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Ghi chú công việc / Lịch trình</label>
                 <textarea 
@@ -671,6 +783,84 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
                   }}
                 >
                   {isUpdatingSchedule ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deadline Details Modal */}
+      {selectedDeadline && (
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedDeadline(null) }}
+          style={{
+          position: 'absolute', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          <div style={{
+            width: 480, background: 'rgba(18,18,18,0.95)', border: `1px solid ${BORDER}`,
+            borderRadius: 16, padding: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                Chỉnh sửa Deadline
+              </div>
+              <button onClick={() => setSelectedDeadline(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#7A7A7A' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Tiêu đề</label>
+                <input 
+                  value={editDeadlineTitle} onChange={e => setEditDeadlineTitle(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none' }} 
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Hạn chót</label>
+                <input 
+                  type="date"
+                  value={editDeadlineDate} onChange={e => setEditDeadlineDate(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none' }} 
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', color: '#7A7A7A', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Trạng thái</label>
+                <select 
+                  value={editDeadlineStatus} onChange={e => setEditDeadlineStatus(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, color: '#fff', fontSize: 13, outline: 'none' }} 
+                >
+                  <option value="pending" style={{ background: BG }}>Chưa hoàn thành</option>
+                  <option value="done" style={{ background: BG }}>Đã xong</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
+                <button 
+                  onClick={handleDeleteDeadline} disabled={isUpdatingDeadline}
+                  style={{
+                    padding: '10px 0', borderRadius: 8,
+                    background: 'rgba(229,62,62,0.15)', border: '1px solid rgba(229,62,62,0.4)', color: '#F87171', fontSize: 13, fontWeight: 700, cursor: isUpdatingDeadline ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Xóa Deadline
+                </button>
+                <button 
+                  onClick={handleUpdateDeadline} disabled={isUpdatingDeadline}
+                  style={{
+                    padding: '10px 0', borderRadius: 8,
+                    background: '#FF5C00', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: isUpdatingDeadline ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 0 16px rgba(255,92,0,0.4)'
+                  }}
+                >
+                  {isUpdatingDeadline ? 'Đang lưu...' : 'Lưu Thay Đổi'}
                 </button>
               </div>
             </div>

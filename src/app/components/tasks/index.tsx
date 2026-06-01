@@ -41,6 +41,7 @@ function mapDbDeadlineToTask(db: any): Task {
     status: db.is_done ? 'done' : 'pending',
     starred: !!db.is_starred,
     notes: '',
+    originalDb: db,
   };
 }
 
@@ -50,8 +51,9 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState<Record<string, boolean>>({ academic: true, work: true, fitness: true });
   
-  // Add Task Modal Form States
+  // Add/Edit Task Modal Form States
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
@@ -160,8 +162,8 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
     }
   };
 
-  // 4. Create Task
-  const handleAddTask = async () => {
+  // 4. Create or Update Task
+  const handleSaveTask = async () => {
     if (!newTitle.trim()) {
       toast.error('Vui lòng nhập tên công việc!');
       return;
@@ -173,17 +175,25 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
 
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('tasks').insert({
-        profile_id: QUAN_UUID,
+      const payload = {
         title: newTitle.trim(),
         category: newCategory.trim() || 'Chung',
         deadline: new Date(newDueDate).toISOString(),
         is_done: false,
         is_starred: newIsStarred,
-      });
+      };
 
-      if (error) throw error;
-      toast.success('Đã lên lịch deadline mới thành công! 🚀');
+      let err;
+      if (editingTaskId) {
+        const { error } = await supabase.from('tasks').update(payload).eq('id', editingTaskId);
+        err = error;
+      } else {
+        const { error } = await supabase.from('tasks').insert({ ...payload, profile_id: QUAN_UUID });
+        err = error;
+      }
+
+      if (err) throw err;
+      toast.success(editingTaskId ? 'Cập nhật deadline thành công! 💅' : 'Đã lên lịch deadline mới thành công! 🚀');
       setShowAddModal(false);
       
       // Reset form controls
@@ -193,6 +203,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
       setNewLink('');
       setNewNotes('');
       setNewIsStarred(false);
+      setEditingTaskId(null);
 
       // Reload
       fetchTasks();
@@ -202,6 +213,27 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleEditClick = (task: Task) => {
+    const db = task.originalDb;
+    setNewTitle(db.title || '');
+    setNewCategory(db.category || '');
+    // format to datetime-local 'YYYY-MM-DDTHH:mm'
+    const due = db.deadline ? new Date(db.deadline).toISOString().slice(0,16) : '';
+    setNewDueDate(due);
+    setNewIsStarred(!!db.is_starred);
+    setEditingTaskId(task.id);
+    setShowAddModal(true);
+  };
+
+  const handleOpenAddModal = () => {
+    setNewTitle('');
+    setNewCategory('');
+    setNewDueDate('');
+    setNewIsStarred(false);
+    setEditingTaskId(null);
+    setShowAddModal(true);
   };
 
   const sortedTasks = [...tasks].sort((a, b) => {
@@ -348,7 +380,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
           </button>
           
           <button 
-            onClick={() => setShowAddModal(true)}
+            onClick={handleOpenAddModal}
             style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10,
               background: `linear-gradient(135deg, ${BLUE}, #3B82F6)`, border: 'none',
@@ -400,6 +432,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
                 onToggle={toggleTask}
                 onToggleStar={toggleStar}
                 onDelete={deleteTask}
+                onEdit={handleEditClick}
               />
             ))
           )}
@@ -411,7 +444,9 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
 
       {/* ── Add Modal Overlay ── */}
       {showAddModal && (
-        <div style={{
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false) }}
+          style={{
           position: 'absolute', inset: 0, zIndex: 50,
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -424,7 +459,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ color: TEXT, fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: BLUE, boxShadow: '0 0 8px rgba(96,165,250,0.8)' }} />
-                Thêm Deadline Mới
+                {editingTaskId ? 'Chỉnh sửa Deadline' : 'Thêm Deadline Mới'}
               </div>
               <button onClick={() => setShowAddModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: MUTED }}>
                 <X size={20} />
@@ -539,7 +574,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
               </div>
 
               <button 
-                onClick={handleAddTask}
+                onClick={handleSaveTask}
                 disabled={isSaving}
                 style={{
                   width: '100%', padding: '12px 0', borderRadius: 8, marginTop: 10,
@@ -547,7 +582,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
                   boxShadow: '0 0 16px rgba(96,165,250,0.4)', opacity: isSaving ? 0.7 : 1
                 }}
               >
-                {isSaving ? 'Đang tạo...' : 'Tạo Deadline'}
+                {isSaving ? 'Đang lưu...' : (editingTaskId ? 'Lưu Thay Đổi' : 'Tạo Deadline')}
               </button>
             </div>
           </div>

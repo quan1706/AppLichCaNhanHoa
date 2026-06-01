@@ -23,4 +23,5 @@ export interface Task {
   link?: string;
   notes?: string;
   starred?: boolean;
+  originalDb?: any;
 }

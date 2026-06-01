@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Star, Trash2 } from 'lucide-react';
+import { Check, Star, Trash2, Edit2 } from 'lucide-react';
 import { Task, ORANGE, MUTED, BLUE, GREEN, BORDER, TEXT } from './tasksUtils';
 
 interface Props {
@@ -11,9 +11,10 @@ interface Props {
   onToggle: (id: string) => void;
   onToggleStar: (id: string) => void;
   onDelete: (id: string) => void;
+  onEdit?: (task: Task) => void;
 }
 
-export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar, onDelete }: Props) {
+export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar, onDelete, onEdit }: Props) {
   // Khẩn cấp nếu chưa xong và thời gian còn <= 1 ngày
   const isUrgent = !isDone && task.daysLeft <= 1;
   
@@ -74,7 +75,20 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar, 
 
       {/* 6. Hành động */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-         <button 
+          <button 
+            onClick={() => onEdit?.(task)}
+            style={{ 
+              background: 'transparent', border: 'none', cursor: 'pointer', padding: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: '50%',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(96,165,250,0.1)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <Edit2 size={16} color={MUTED} />
+          </button>
+          <button 
             onClick={() => onToggleStar(task.id)}
             style={{ 
               background: 'transparent', border: 'none', cursor: 'pointer', padding: 6,
@@ -84,7 +98,7 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar, 
               transition: 'background-color 0.2s',
             }}
           >
-            <Star size={18} fill={isStarred ? "#EAB308" : "transparent"} color={isStarred ? "#EAB308" : MUTED} />
+            <Star size={16} fill={isStarred ? "#EAB308" : "transparent"} color={isStarred ? "#EAB308" : MUTED} />
           </button>
           <button 
             onClick={() => onDelete(task.id)}
@@ -97,7 +111,7 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar, 
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            <Trash2 size={18} color="#EF4444" />
+            <Trash2 size={16} color="#EF4444" />
           </button>
       </div>
     </div>

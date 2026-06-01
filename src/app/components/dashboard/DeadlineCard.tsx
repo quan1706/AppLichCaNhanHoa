@@ -1,13 +1,14 @@
 'use client';
 
-import { AlertCircle, Clock } from 'lucide-react';
+import { AlertCircle, Clock, Edit2 } from 'lucide-react';
 import { CARD2, ORANGE, MUTED, BORDER, TEXT, BG, DbDeadline } from './calendarUtils';
 
 interface Props {
   items: DbDeadline[];
+  onEdit?: (dl: DbDeadline) => void;
 }
 
-export function DeadlineCard({ items }: Props) {
+export function DeadlineCard({ items, onEdit }: Props) {
   // Process DB data, enrich with days remaining
   const processed = items.map(item => {
     const due      = new Date(item.due_date);
@@ -58,6 +59,11 @@ export function DeadlineCard({ items }: Props) {
               <span style={{ color: item.urgent ? ORANGE : MUTED, fontSize: 10.5, fontWeight: 700 }}>
                 {item.days < 0 ? `Quá hạn ${Math.abs(item.days)} ngày` : item.days === 0 ? 'Hôm nay' : `Còn ${item.days} ngày`}
               </span>
+              {onEdit && (
+                <button onClick={() => onEdit(items[idx])} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', marginLeft: 4, padding: 2 }}>
+                  <Edit2 size={12} color={MUTED} />
+                </button>
+              )}
             </div>
           </div>
         ))}
