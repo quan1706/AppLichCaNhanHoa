@@ -132,12 +132,12 @@ export function Screen3Nutrition({ onChangeTab }: { onChangeTab?: (tab: any) => 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
         {/* Header */}
-        <div style={{
+        <div className="nutrition-header" style={{
           padding: '20px 28px', flexShrink: 0, background: 'rgba(10,10,10,0.9)', backdropFilter: 'blur(16px)',
           borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="header-title-row" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 4, height: 20, borderRadius: 2, background: GREEN, boxShadow: `0 0 10px rgba(34,197,94,0.8)` }} />
               <span style={{ color: TEXT, fontSize: 20, fontWeight: 800 }}>Dinh dưỡng & Kỷ luật</span>
               <span style={{ padding: '4px 10px', background: 'rgba(34,197,94,0.1)', color: GREEN, fontSize: 10, fontWeight: 700, borderRadius: 12, border: '1px solid rgba(34,197,94,0.2)' }}>
@@ -158,7 +158,7 @@ export function Screen3Nutrition({ onChangeTab }: { onChangeTab?: (tab: any) => 
         </div>
 
         {/* Scrollable body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', position: 'relative' }}>
+        <div className="nutrition-scroll-body" style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', position: 'relative' }}>
           
           {isLoading ? (
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,8,8,0.7)', zIndex: 10 }}>
@@ -173,6 +173,18 @@ export function Screen3Nutrition({ onChangeTab }: { onChangeTab?: (tab: any) => 
             @media (max-width: 768px) {
               .nutrition-grid {
                 grid-template-columns: 1fr !important;
+              }
+              .nutrition-header {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 16px !important;
+                padding: 20px 16px !important;
+              }
+              .nutrition-scroll-body {
+                padding: 16px 16px !important;
+              }
+              .header-title-row {
+                flex-wrap: wrap !important;
               }
             }
           `}} />

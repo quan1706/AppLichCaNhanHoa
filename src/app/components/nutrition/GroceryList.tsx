@@ -12,7 +12,7 @@ export function GroceryList({ groceries = [], onToggleGrocery }: Props) {
   
   if (!groceries || groceries.length === 0) {
     return (
-      <div style={{ width: 340, minWidth: 340, padding: '40px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="grocery-container" style={{ width: '100%', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ color: MUTED, fontSize: 13, fontWeight: 600 }}>Chưa có danh sách mua sắm tuần này. 💅</span>
       </div>
     );
@@ -29,7 +29,14 @@ export function GroceryList({ groceries = [], onToggleGrocery }: Props) {
   });
 
   return (
-    <div style={{ width: 340, minWidth: 340, padding: '20px 20px', overflowY: 'auto' }}>
+    <div className="grocery-container" style={{ width: '100%', padding: '20px', overflowY: 'auto' }}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media (max-width: 768px) {
+          .grocery-container {
+            padding: 20px 10px !important;
+          }
+        }
+      `}} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <ShoppingCart size={15} color={GREEN} style={{ filter: 'drop-shadow(0 0 4px rgba(34,197,94,0.6))' }} />
         <span style={{ color: TEXT, fontSize: 14, fontWeight: 700 }}>Danh sách đi chợ tuần</span>

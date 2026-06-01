@@ -35,6 +35,18 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
     { id: 1, shift: 'morning' as 'morning' | 'afternoon', start: '08:00', end: '12:00' },
     { id: 2, shift: 'afternoon' as 'morning' | 'afternoon', start: '13:00', end: '17:00' },
   ]);
+  const [workouts, setWorkouts] = useState([
+    { id: 1, name: 'Pickleball 🏓', days: 'T3, T7', time: '5:00–7:00 CH' },
+    { id: 2, name: 'Gym / Kháng lực 🏋️', days: 'T5', time: '5:30–7:00 CH' },
+    { id: 3, name: 'Chạy bộ 🏃', days: 'T2, T6', time: '6:00–7:00 CH' },
+  ]);
+  const [notifications, setNotifications] = useState([
+    { id: 'water', label: 'Nhắc nhở uống nước', sub: 'Mỗi 2 tiếng qua Telegram', on: true, color: BLUE },
+    { id: 'prep', label: 'Nhắc chuẩn bị đồ ăn', sub: '7:00 tối CN hàng tuần', on: true, color: ORANGE },
+    { id: 'workout', label: 'Nhắc nhở tập luyện', sub: '30 phút trước buổi tập', on: true, color: GREEN },
+    { id: 'deadline', label: 'Cảnh báo Deadline khẩn', sub: 'Trước 3 ngày, 1 ngày, 1h', on: true, color: '#F87171' },
+    { id: 'report', label: 'Báo cáo tiến trình tuần', sub: 'CN 9:00 tối hàng tuần', on: false, color: PURPLE },
+  ]);
 
   // 1. Fetch Profile Data
   const fetchProfile = async () => {
@@ -58,6 +70,24 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
         setTelegramUsername(data.telegram_username || '');
         setBotToken(data.bot_token || '');
         setBotPersonality(data.bot_personality || 'Đanh Đá 🔥');
+
+        if (data.schedule_config) {
+          setClassDays(data.schedule_config.classDays || [0, 2, 4]);
+          setWorkDays(data.schedule_config.workDays || [0, 1, 2, 3, 4]);
+          setClassSlots(data.schedule_config.classSlots || [{ id: 1, shift: 'morning', start: '07:00', end: '11:00' }]);
+          setWorkSlots(data.schedule_config.workSlots || [
+            { id: 1, shift: 'morning', start: '08:00', end: '12:00' },
+            { id: 2, shift: 'afternoon', start: '13:00', end: '17:00' }
+          ]);
+          setWorkouts(data.schedule_config.workouts || [
+            { id: 1, name: 'Pickleball 🏓', days: 'T3, T7', time: '5:00–7:00 CH' },
+            { id: 2, name: 'Gym / Kháng lực 🏋️', days: 'T5', time: '5:30–7:00 CH' },
+            { id: 3, name: 'Chạy bộ 🏃', days: 'T2, T6', time: '6:00–7:00 CH' },
+          ]);
+        }
+        if (data.notification_config) {
+          setNotifications(data.notification_config);
+        }
       }
     } catch (err) {
       console.error('Lỗi nạp cấu hình:', err);
@@ -88,6 +118,8 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
           telegram_username: telegramUsername,
           bot_token: botToken,
           bot_personality: botPersonality,
+          schedule_config: { classDays, workDays, classSlots, workSlots, workouts },
+          notification_config: notifications,
         })
         .eq('id', QUAN_UUID);
 
@@ -119,10 +151,19 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
     setter(prev => prev.map(s => s.id === id ? { ...s, shift: s.shift === 'morning' ? 'afternoon' : 'morning' } : s));
   };
 
-  const ShiftSlotRow = ({ slot, onToggleShift, onRemove, accentColor }: {
+  const updateSlotTime = (id: number, setter: React.Dispatch<React.SetStateAction<any[]>>, field: 'start'|'end', value: string) => {
+    setter(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+  };
+
+  const toggleNotification = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, on: !n.on } : n));
+  };
+
+  const ShiftSlotRow = ({ slot, onToggleShift, onRemove, onChangeTime, accentColor }: {
     slot: { id: number; shift: 'morning' | 'afternoon'; start: string; end: string };
     onToggleShift: () => void;
     onRemove: () => void;
+    onChangeTime: (field: 'start' | 'end', value: string) => void;
     accentColor: string;
   }) => (
     <div className="settings-flex-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -142,12 +183,12 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
 
       {/* Time range */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-        <input type="time" defaultValue={slot.start} style={{
+        <input type="time" value={slot.start} onChange={e => onChangeTime('start', e.target.value)} style={{
           flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.08)`,
           borderRadius: 8, color: TEXT, fontSize: 12, padding: '7px 10px', outline: 'none',
         }} />
         <span style={{ color: MUTED, fontSize: 11 }}>–</span>
-        <input type="time" defaultValue={slot.end} style={{
+        <input type="time" value={slot.end} onChange={e => onChangeTime('end', e.target.value)} style={{
           flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.08)`,
           borderRadius: 8, color: TEXT, fontSize: 12, padding: '7px 10px', outline: 'none',
         }} />
@@ -306,6 +347,7 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
                       key={slot.id} slot={slot}
                       onToggleShift={() => toggleShift(slot.id, setClassSlots)}
                       onRemove={() => removeSlot(slot.id, setClassSlots)}
+                      onChangeTime={(field, val) => updateSlotTime(slot.id, setClassSlots, field, val)}
                       accentColor="#F87171"
                     />
                   ))}
@@ -334,6 +376,7 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
                       key={slot.id} slot={slot}
                       onToggleShift={() => toggleShift(slot.id, setWorkSlots)}
                       onRemove={() => removeSlot(slot.id, setWorkSlots)}
+                      onChangeTime={(field, val) => updateSlotTime(slot.id, setWorkSlots, field, val)}
                       accentColor="#F87171"
                     />
                   ))}
@@ -347,21 +390,25 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: ORANGE, boxShadow: '0 0 6px rgba(255,92,0,0.8)' }} />
                     <span style={{ color: TEXT, fontSize: 13, fontWeight: 700 }}>Tập luyện & Thể hình</span>
                   </div>
-                  <button style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, background: 'rgba(255,92,0,0.1)', border: '1px solid rgba(255,92,0,0.25)', color: ORANGE, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                  <button 
+                    onClick={() => {
+                      const name = window.prompt('Nhập tên môn tập:');
+                      const days = window.prompt('Ngày tập (VD: T3, T7):');
+                      const time = window.prompt('Giờ tập (VD: 5:00–7:00 CH):');
+                      if (name) setWorkouts(prev => [...prev, { id: Date.now(), name, days: days || '', time: time || '' }]);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, background: 'rgba(255,92,0,0.1)', border: '1px solid rgba(255,92,0,0.25)', color: ORANGE, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                  >
                     <Plus size={11} /> Thêm
                   </button>
                 </div>
-                {[
-                  { name: 'Pickleball 🏓', days: 'T3, T7', time: '5:00–7:00 CH' },
-                  { name: 'Gym / Kháng lực 🏋️', days: 'T5', time: '5:30–7:00 CH' },
-                  { name: 'Chạy bộ 🏃', days: 'T2, T6', time: '6:00–7:00 CH' },
-                ].map((w, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: i < 2 ? `1px solid ${BORDER}` : 'none' }}>
+                {workouts.map((w, i) => (
+                  <div key={w.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: i < workouts.length - 1 ? `1px solid ${BORDER}` : 'none' }}>
                     <div>
                       <div style={{ color: TEXT, fontSize: 12, fontWeight: 600 }}>{w.name}</div>
                       <div style={{ color: MUTED, fontSize: 10, marginTop: 2 }}>{w.days} · {w.time}</div>
                     </div>
-                    <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
+                    <button onClick={() => setWorkouts(prev => prev.filter(x => x.id !== w.id))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
                       <Trash2 size={13} color={MUTED} />
                     </button>
                   </div>
@@ -371,22 +418,18 @@ export function Screen4Settings({ onChangeTab }: { onChangeTab?: (tab: any) => v
 
             {/* ── Notifications ── */}
             <SectionCard title="Cấu hình thông báo" subtitle="Nhắc nhở qua Telegram Bot" icon={<Bell size={17} color={GREEN} />} neon={GREEN}>
-              {[
-                { label: 'Nhắc nhở uống nước',     sub: 'Mỗi 2 tiếng qua Telegram', on: true,  color: BLUE },
-                { label: 'Nhắc chuẩn bị đồ ăn',    sub: '7:00 tối CN hàng tuần',    on: true,  color: ORANGE },
-                { label: 'Nhắc nhở tập luyện',      sub: '30 phút trước buổi tập',   on: true,  color: GREEN },
-                { label: 'Cảnh báo Deadline khẩn',  sub: 'Trước 3 ngày, 1 ngày, 1h', on: true,  color: '#F87171' },
-                { label: 'Báo cáo tiến trình tuần', sub: 'CN 9:00 tối hàng tuần',    on: false, color: PURPLE },
-              ].map((item, i) => (
-                <div key={i} style={{
+              {notifications.map((item, i) => (
+                <div key={item.id} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '13px 0', borderBottom: i < 4 ? `1px solid ${BORDER}` : 'none',
+                  padding: '13px 0', borderBottom: i < notifications.length - 1 ? `1px solid ${BORDER}` : 'none',
                 }}>
                   <div>
                     <div style={{ color: TEXT, fontSize: 13, fontWeight: 600 }}>{item.label}</div>
                     <div style={{ color: MUTED, fontSize: 11, marginTop: 2 }}>{item.sub}</div>
                   </div>
-                  <NToggle on={item.on} color={item.color} />
+                  <div onClick={() => toggleNotification(item.id)} style={{ cursor: 'pointer' }}>
+                    <NToggle on={item.on} color={item.color} />
+                  </div>
                 </div>
               ))}
             </SectionCard>

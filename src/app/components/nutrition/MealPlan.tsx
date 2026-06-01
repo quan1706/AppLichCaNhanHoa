@@ -39,10 +39,26 @@ export function MealPlan({ mealPlans = [] }: Props) {
   const mealsList = dayPlan.meals || [];
 
   return (
-    <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto', borderRight: `1px solid ${BORDER}` }}>
+    <div className="meal-plan-container" style={{ flex: 1, padding: '20px 24px', overflowY: 'auto', borderRight: `1px solid ${BORDER}` }}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media (max-width: 768px) {
+          .meal-plan-container {
+            border-right: none !important;
+            border-bottom: 1px solid ${BORDER} !important;
+            padding: 20px 0 !important;
+          }
+          .donut-grid {
+            grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)) !important;
+            gap: 8px !important;
+          }
+          .donut-item {
+            padding: 14px 0 !important;
+          }
+        }
+      `}} />
       {/* ── KPI Donut rings ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 22 }}>
-        <div style={{
+      <div className="donut-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 22 }}>
+        <div className="donut-item" style={{
           background: GLASS, backdropFilter: 'blur(12px)', borderRadius: 14,
           border: '1px solid rgba(255,92,0,0.15)', padding: '18px 0',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
@@ -50,7 +66,7 @@ export function MealPlan({ mealPlans = [] }: Props) {
           <DonutRing size={90} value={1600} max={2000} color={ORANGE} label={`~1600`} sublabel="kcal" />
           <span style={{ color: MUTED, fontSize: 11, fontWeight: 600 }}>Calo hôm nay</span>
         </div>
-        <div style={{
+        <div className="donut-item" style={{
           background: GLASS, backdropFilter: 'blur(12px)', borderRadius: 14,
           border: '1px solid rgba(34,197,94,0.15)', padding: '18px 0',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
@@ -58,7 +74,7 @@ export function MealPlan({ mealPlans = [] }: Props) {
           <DonutRing size={90} value={138} max={138} color={GREEN} label={`~138g`} sublabel="/ 138g" />
           <span style={{ color: MUTED, fontSize: 11, fontWeight: 600 }}>Protein hôm nay</span>
         </div>
-        <div style={{
+        <div className="donut-item" style={{
           background: GLASS, backdropFilter: 'blur(12px)', borderRadius: 14,
           border: '1px solid rgba(96,165,250,0.15)', padding: '18px 0',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
