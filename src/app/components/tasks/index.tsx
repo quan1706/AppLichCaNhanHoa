@@ -146,6 +146,20 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
     }
   };
 
+  // 3.5 Delete Task
+  const deleteTask = async (id: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa deadline này?')) return;
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Đã xóa deadline thành công!');
+      setTasks(prev => prev.filter(t => t.id !== id));
+    } catch (err) {
+      console.error(err);
+      toast.error('Lỗi khi xóa!');
+    }
+  };
+
   // 4. Create Task
   const handleAddTask = async () => {
     if (!newTitle.trim()) {
@@ -356,11 +370,11 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
 
           {/* Table headers */}
           <div className="tasks-table-min-width tasks-table-header" style={{
-            display: 'grid', gridTemplateColumns: '32px 1fr 130px 110px 120px 60px',
+            display: 'grid', gridTemplateColumns: '32px 1fr 130px 110px 120px 80px',
             gap: 12, padding: '6px 16px', marginBottom: 6,
             color: MUTED, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
           }}>
-            <div /> <div>Công việc</div> <div>Môn học</div> <div>Hạn chót</div> <div>Trạng thái</div> <div style={{ textAlign: 'center' }}>Ưu tiên</div>
+            <div /> <div>Công việc</div> <div>Môn học</div> <div>Hạn chót</div> <div>Trạng thái</div> <div style={{ textAlign: 'center' }}>Hành động</div>
           </div>
 
           {/* Dynamic Content Loader */}
@@ -385,6 +399,7 @@ export function Screen2Tasks({ onChangeTab }: { onChangeTab?: (tab: any) => void
                 isStarred={!!task.starred}
                 onToggle={toggleTask}
                 onToggleStar={toggleStar}
+                onDelete={deleteTask}
               />
             ))
           )}

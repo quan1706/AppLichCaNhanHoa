@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Star } from 'lucide-react';
+import { Check, Star, Trash2 } from 'lucide-react';
 import { Task, ORANGE, MUTED, BLUE, GREEN, BORDER, TEXT } from './tasksUtils';
 
 interface Props {
@@ -10,15 +10,16 @@ interface Props {
   isStarred: boolean;
   onToggle: (id: string) => void;
   onToggleStar: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
-export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar }: Props) {
+export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar, onDelete }: Props) {
   // Khẩn cấp nếu chưa xong và thời gian còn <= 1 ngày
   const isUrgent = !isDone && task.daysLeft <= 1;
   
   return (
     <div className="tasks-table-min-width task-row" style={{
-      display: 'grid', gridTemplateColumns: '32px 1fr 130px 110px 120px 60px',
+      display: 'grid', gridTemplateColumns: '32px 1fr 130px 110px 120px 80px',
       gap: 12, padding: '16px', marginBottom: 8,
       background: 'rgba(18,18,18,0.4)', borderRadius: 12,
       border: `1px solid ${isUrgent ? 'rgba(255,92,0,0.3)' : BORDER}`,
@@ -71,8 +72,8 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar }
         </span>
       </div>
 
-      {/* 6. Ưu tiên (Star) */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
+      {/* 6. Hành động */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
          <button 
             onClick={() => onToggleStar(task.id)}
             style={{ 
@@ -84,6 +85,19 @@ export function TaskRow({ task, idx, isDone, isStarred, onToggle, onToggleStar }
             }}
           >
             <Star size={18} fill={isStarred ? "#EAB308" : "transparent"} color={isStarred ? "#EAB308" : MUTED} />
+          </button>
+          <button 
+            onClick={() => onDelete(task.id)}
+            style={{ 
+              background: 'transparent', border: 'none', cursor: 'pointer', padding: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: '50%',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <Trash2 size={18} color="#EF4444" />
           </button>
       </div>
     </div>

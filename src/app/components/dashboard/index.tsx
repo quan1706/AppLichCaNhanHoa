@@ -26,7 +26,7 @@ export type ChatMessage = {
 export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { onChangeTab?: (tab: any) => void; showAiChat?: boolean; setShowAiChat?: (show: boolean) => void }) {
   // States
   const [viewMode, setViewMode] = useState<'week' | 'month' | 'year'>('week');
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 4, 29)); // Default to sample date
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [waterIntake, setWaterIntake] = useState(0);
   const [aiPrompt, setAiPrompt] = useState('');
   const [isSendingAi, setIsSendingAi] = useState(false);
@@ -281,8 +281,7 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
   const startOfWeek = getMonday(currentDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const nextD = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + i);
-    const isSampleToday = nextD.getFullYear() === 2026 && nextD.getMonth() === 4 && nextD.getDate() === 29;
-    return { short: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][i], date: nextD.getDate(), fullDate: nextD, today: isSampleToday || nextD.toDateString() === new Date().toDateString() };
+    return { short: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][i], date: nextD.getDate(), fullDate: nextD, today: nextD.toDateString() === new Date().toDateString() };
   });
 
   const shiftTime = (dir: 1 | -1) => {
@@ -290,7 +289,7 @@ export function Screen1Dashboard({ onChangeTab, showAiChat, setShowAiChat }: { o
     else if (viewMode === 'month') setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1 * dir, 1));
     else setCurrentDate(prev => new Date(prev.getFullYear() + 1 * dir, prev.getMonth(), 1));
   };
-  const goToday = () => setCurrentDate(new Date(2026, 4, 29));
+  const goToday = () => setCurrentDate(new Date());
 
   const getNavLabel = () => {
     if (viewMode === 'week') {
